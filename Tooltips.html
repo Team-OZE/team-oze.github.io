@@ -18,7 +18,8 @@
         }
         #main > div {
             padding: 0.5rem;
-            border: 2px solid dimgray;
+            border: 2px solid #20472A;
+            border-left-width: 6px;
             box-sizing: border-box;
         }
         #main > div > div:first-child {
@@ -47,12 +48,21 @@
 <script>
     const container = document.getElementById('main');
     fetch('./tooltips.json').then((res) => res.json()).then((data) => {
+        let isLastAbil = false;
         for(const d of data) {
             const contentDiv = document.createElement('div')
             contentDiv.innerHTML = d.builderUbertip
             const headerDiv = document.createElement('div')
             headerDiv.innerHTML = d.name
             const outerDiv = document.createElement('div')
+            if(d.type === "ability") outerDiv.setAttribute('style', 'border-color: #47203D')
+
+            if(d.type === 'unit') {
+                outerDiv.setAttribute('style', 'border-left-width: 12px')
+            }
+            if(d.type === 'ability') isLastAbil = true
+            else isLastAbil = false
+
             outerDiv.appendChild(headerDiv)
             outerDiv.appendChild(contentDiv)
             container.appendChild(outerDiv)
