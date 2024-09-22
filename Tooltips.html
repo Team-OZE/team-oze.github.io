@@ -17,10 +17,9 @@
             color: lightgray;
         }
         #main > div {
-            padding: 0.5rem;
             border: 2px solid #20472A;
             border-left-width: 6px;
-            padding-left: 6px;
+            padding: 0.5rem 0.5rem 0.5rem calc(0.5rem + 6px);
             box-sizing: border-box;
         }
         #main > div > div:first-child {
@@ -59,7 +58,7 @@
             if(d.type === "ability") outerDiv.setAttribute('style', 'border-color: #47203D')
 
             if(d.type === 'unit') {
-                outerDiv.setAttribute('style', 'border-left-width: 12px; padding-left: 0!important')
+                outerDiv.setAttribute('style', 'border-left-width: 12px; padding-left: 0.5rem')
             }
             if(d.type === 'ability') isLastAbil = true
             else isLastAbil = false
