@@ -23,6 +23,12 @@
         window.onload = () => {
             const search = new URLSearchParams(window.location.search)
             const race = search.get('race') || 'human'
+            const isSilver = search.has('silver')
+
+            if(search.has('silver') ) {
+                const img = document.getElementById('cbbg')
+                img.setAttribute('src', `../assets/checkbox-background-silver.png`)
+            }
 
             if(search.has('depressed') ) {
                 const img = document.createElement('img')
@@ -41,6 +47,6 @@
     </script>
 </head>
 <body>
-<img src="../assets/checkbox-background.png" style="z-index: 1"/>
+<img src="../assets/checkbox-background.png" style="z-index: 1" id="cbbg"/>
 </body>
 </html>

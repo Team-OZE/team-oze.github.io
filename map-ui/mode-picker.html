@@ -104,13 +104,14 @@
         #w3c-text {
             flex-grow: 1;
             font-family: 'Friz Quadrata';
-            font-size: 16pt;
+            font-size: 14pt;
             max-width: calc(100% - 220px);
             text-align: justify;
         }
         .divider {
             background-image: url("assets/divider.png");
             height: 4px;
+            min-height: 4px;
             background-repeat: no-repeat;
             background-position: center;
         }
@@ -140,13 +141,12 @@
         .modepicker-choices-container {
             padding: 0 32px;
             display: flex;
-            > div:not(:last-child):not(.gap) {
-                flex-grow: 1;
-            }
             > div.gap {
                 min-width: 20px;
             }
-            > div {
+            > div:not(.gap) {
+                flex-basis: 33%;
+                flex-grow: 1;
                 max-width: 400px;
             }
         }
@@ -173,7 +173,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 70px;
+            height: 60px;
             position: relative;
             > div {
                 text-transform: uppercase;
@@ -273,15 +273,15 @@
                     <img src="assets/w3c-logo-medium.png" id="w3c-logo"/>
                 </div>
                 <div id="w3c-text">
-                    <b style="margin-bottom: 8px; color: gold">Join W3Champions to be a cool guy 👑</b>
+                    <b style="margin-bottom: 8px; color: gold">Join W3Champions 👑</b>
                     <ul>
                         <li><span>No more worrying about cheaters, corrupting maps and lost stats.</span></li>
+                        <li><span>No desyncs.</span></li>
                         <li><span>Fair matchmaking with respect to centralised ELO.</span></li>
                         <li><span>Climb the dedicated LTD ladders and become a Grandmaster, maybe even a Champion?!</span></li>
                         <li><span>Wanna play with friends? We got you covered, queue up together as a team!</span></li>
                     </ul>
-                    <br/>
-                    <span style="color: gold">Find out more</span> in the Discord, or at <b>w3champions.com</b>
+                    <span style="color: gold">Find out more</span> in Discord, or at <b>w3champions.com</b>
                 </div>
             </div>
             <div class="divider" style="margin: 20px 0"></div>
@@ -297,7 +297,7 @@
                                 <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -PR: Random Prophet
                             </div>
                             <div class="modepicker-choice-desc">
-                                The prophet gets re-rolled each wave
+                                You get a pool of random units to build each wave
                             </div>
                         </div>
                         <div class="modepicker-choice">
@@ -305,7 +305,7 @@
                                 <iframe src="components/checkbox.html?depressed" class="checkbox-frame"></iframe> -PH: Manual Prophet
                             </div>
                             <div class="modepicker-choice-desc">
-                                <!-- TODO --> !TODO!
+                                You may re-randomise your pool of buildable units 6 times per game
                             </div>
                         </div>
                         <div class="modepicker-choice">
@@ -313,7 +313,7 @@
                                 <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -AP: All Pick
                             </div>
                             <div class="modepicker-choice-desc">
-                                You may choose any prophet each wave
+                                You pick your building pool, you may change your choice up to 5 times per game
                             </div>
                         </div>
                         <div class="modepicker-choice">
@@ -321,7 +321,7 @@
                                 <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -HB: Hybrid Builder
                             </div>
                             <div class="modepicker-choice-desc">
-                                <!-- TODO --> !TODO!
+                                You may build a random tower of a selected tier for the average price
                             </div>
                         </div>
                     </div>
@@ -332,7 +332,7 @@
                                 <iframe src="components/checkbox.html?depressed" class="checkbox-frame"></iframe> -CC: Challenge Champions
                             </div>
                             <div class="modepicker-choice-desc">
-                                Each player may manually challenge a champion for themselves each level
+                                Each player may manually challenge a Creep Champion every level
                             </div>
                         </div>
                         <div class="modepicker-choice">
@@ -340,13 +340,17 @@
                                 <iframe src="components/checkbox.html?" class="checkbox-frame"></iframe> -AC: Auto Champions
                             </div>
                             <div class="modepicker-choice-desc">
-                                Champions will spawn every wave after wave 4
+                                Creep Champions will spawn every wave after wave 4
                             </div>
                         </div>
                         <div class="modepicker-choice">
                             <div class="modepicker-choice-control">
                                 <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -NC: No Champions
                             </div>
+                            <div class="modepicker-choice-desc">
+                                No Creep Champions will spawn
+                            </div>
+
                         </div>
                     </div>
                     <div class="gap"></div>
@@ -387,25 +391,16 @@
                 </div>
 
 
-                <div style="margin: 10px 0"></div>
+                <div class="divider" style="margin: 10px 0"></div>
 
                 <div class="modepicker-choices-container">
-                    <div style="flex-grow: 1"></div>
                     <div>
                         <div class="modepicker-choice">
                             <div class="modepicker-choice-control">
-                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -AH: Allow Hybrid
+                                <iframe src="components/checkbox.html?silver" class="checkbox-frame"></iframe> -AH: Allow Hybrid
                             </div>
                             <div class="modepicker-choice-desc">
-                                Allow Hybrid Builder in PR/PH mode
-                            </div>
-                        </div>
-                        <div class="modepicker-choice">
-                            <div class="modepicker-choice-control">
-                                <iframe src="components/checkbox.html?checked" class="checkbox-frame"></iframe> -MI: Mirror Mode
-                            </div>
-                            <div class="modepicker-choice-desc">
-                                <!-- TODO --> !TODO!
+                                Allow Hybrid Builder in PR/PH mode<br/>&nbsp;
                             </div>
                         </div>
                     </div>
@@ -413,30 +408,41 @@
                     <div>
                         <div class="modepicker-choice">
                             <div class="modepicker-choice-control">
-                                <iframe src="components/checkbox.html?" class="checkbox-frame"></iframe> -EZ: Easy Mode
+                                <iframe src="components/checkbox.html?checked&silver" class="checkbox-frame"></iframe> -MI: Mirror Mode
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                The random build pools are the same across teams for players at the same positions
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gap"></div>
+                    <div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?silver" class="checkbox-frame"></iframe> -EZ: Easy Mode
                             </div>
                             <div class="modepicker-choice-desc">
                                 Wave damage is decreased, the King is more powerful
                             </div>
                         </div>
+                    </div>
+                    <div class="gap"></div>
+                    <div>
                         <div class="modepicker-choice">
                             <div class="modepicker-choice-control">
-                                <iframe src="components/checkbox.html?checked" class="checkbox-frame"></iframe> -HM: Hard Mode
+                                <iframe src="components/checkbox.html?checked&silver" class="checkbox-frame"></iframe> -HM: Hard Mode
                             </div>
                             <div class="modepicker-choice-desc">
                                 Wave damage is increased
                             </div>
                         </div>
                     </div>
-                    <div style="flex-grow: 1"></div>
                 </div>
             </div>
 
-            <div style="flex-grow: 1; margin: 20px 0">
-                <div class="divider"></div>
-            </div>
+            <div class="divider" style="margin: 20px 0"></div>
 
-            <div style="margin-bottom: 40px; display: flex; align-items: center; justify-content: center">
+            <div style="margin-bottom: 20px; display: flex; align-items: center; justify-content: center">
                 <div class="button-start">
                     <img src="assets/wc3_btn_green_normal_4k.png"/>
                     <div>Start Game</div>
