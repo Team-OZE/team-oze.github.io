@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="../fonts/friz-quadrata.css"/>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            /*border: 2px solid red;*/
+            height: 1080px;
+            width: 1920px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .frame {
+            z-index: 100;
+            position: absolute;
+            top: calc((1080px - 128px * 8) / 2);
+            left:  calc((1920px - 128px * 12) / 2);
+            width: calc(128px * 12);
+            height: calc(128px * 8);
+            border: none;
+        }
+        .frame-bg {
+            z-index: -100;
+            position: absolute;
+            top: calc((1080px - 128px * 8) / 2);
+            left:  calc((1920px - 128px * 12) / 2);
+            width: calc(128px * 12);
+            height: calc(128px * 8);
+            border: none;
+        }
+        #content {
+            width: calc(128px * 12);
+            height: calc(128px * 8);
+            padding: 72px;
+            box-sizing: border-box;
+            z-index: 1;
+            color: #eee;
+            font-size: 14pt;
+            display: flex;
+            font-family: 'Noto Serif', serif;
+        }
+        #pane-main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #pane-main > div {
+            width: 100%;
+        }
+        #gap {
+            width: 16px;
+        }
+        #pane-side {
+            width: 300px;
+            min-width: 300px;
+        }
+        .pane {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        ul {
+            list-style-position: inside;
+            padding-left: 5px;
+            > li {
+                text-align: justify;
+                > span {
+                    position: relative;
+                    left:  -8px;
+                }
+            }
+        }
+        #w3c-banner {
+            position: absolute; top: 0; right: 0;
+            width: 100%;
+        }
+        #w3c-banner-container {
+            margin-top: -20px;
+            position: relative;
+            width: 220px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        #w3c-logo {
+            width: 110px;
+            margin-top: 60px;
+            z-index: 2;
+        }
+        #w3c-text {
+            flex-grow: 1;
+            font-family: 'Friz Quadrata';
+            font-size: 16pt;
+            max-width: calc(100% - 220px);
+            text-align: justify;
+        }
+        .divider {
+            background-image: url("assets/divider.png");
+            height: 4px;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .modepicker-title-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 79px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        #modepicker-title-bg {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            z-index: 1;
+            transform: translateX(-50%);
+            height: 100%;
+        }
+        #modepicker-title-text {
+            z-index: 2;
+            padding-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .modepicker-choices-container {
+            padding: 0 32px;
+            display: flex;
+            > div:not(:last-child):not(.gap) {
+                flex-grow: 1;
+            }
+            > div.gap {
+                min-width: 20px;
+            }
+            > div {
+                max-width: 400px;
+            }
+        }
+        .modepicker-choice {
+            margin-bottom: 8px;
+        }
+        .modepicker-choice-control {
+            display: flex;
+            align-items: center;
+            > iframe {
+                margin-right: 8px;
+            }
+        }
+        .modepicker-choice-desc {
+            font-style: italic;
+            font-size: 12pt;
+        }
+        .checkbox-frame {
+            width: 32px;
+            height: 32px;
+            border: none;
+        }
+        .button-start {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 70px;
+            position: relative;
+            > div {
+                text-transform: uppercase;
+                z-index: 2;
+                font-size: 20pt;
+                font-weight: bold;
+                color: gold;
+            }
+            > img {
+                height: 100%;
+                position: absolute;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 1;
+            }
+        }
+    </style>
+    <script>
+        window.onload = () => {
+            const query = new URLSearchParams(window.location.search)
+            const race = query.get('race') || 'nightelf'
+            const empty = query.has('empty')
+            if (race === 'human') {
+                document.getElementById('w3c-banner-container').setAttribute('style', 'margin-top: -26px')
+                document.getElementById('w3c-logo').setAttribute('style', 'margin-top: 50px')
+            }
+            for(const el of document.getElementsByClassName('set-race')) {
+                const src = el.getAttribute('src')
+                if(src) el.setAttribute('src', src.replace(/\%race\%/gi, race))
+            }
+            for(const el of document.getElementsByClassName('checkbox-frame')) {
+                const src = el.getAttribute('src') || ''
+                console.log(src)
+                const [_, path, s] = src.match(/^([^?]+)(?:\?(.*))?$/)
+                const search = new URLSearchParams(s)
+                if(!search.has('race')) {
+                    search.set('race', race)
+                }
+                if(empty) {
+                    if(search.has('checked')) search.delete('checked')
+                    if(search.has('depressed')) search.delete('depressed')
+                }
+                el.setAttribute('src', path + `?${search.toString()}`)
+            }
+        }
+
+    </script>
+</head>
+<body style="background: #111">
+    <iframe src="components/frame.html?race=%RACE%&height=8&width=12" class="frame set-race"></iframe>
+    <iframe src="components/frame-bg.html?race=%RACE%&height=8&width=12" class="frame-bg set-race"></iframe>
+    <div id="content">
+        <div id="pane-side" class="pane">
+            <h1 style="text-align: center; margin-bottom: 16px; color: gold">Welcome to <br/>Legion TD</h1>
+            <div style="flex-grow: 1;text-align: center; display: flex; flex-direction: column">
+                <div style="text-align: justify; margin-bottom: 12px">
+                    You are playing Legion TD v11.2, delivered with love by Team OZE.
+                </div>
+                <div style="text-align: justify; flex-grow: 1">
+                    <b style="color: gold">📝 Recent changes:</b>
+                    <ul>
+                        <li><span>Changed that that that and that, made that better</span></li>
+                        <li><span>Changed that that that and that, made that better</span></li>
+                        <li><span>Changed that that that and that, made that better</span></li>
+                        <li><span>Changed that that that and that, made that better</span></li>
+                    </ul>
+                </div>
+                <div style="min-height: 20px">
+                </div>
+                <div>
+                    <b style="color: gold">STAY UP-TO-DATE!</b><br/>
+                    Be the <b>first</b> to hear about our news, tournaments, streams, map updates, and engage with the <b>10K+</b> player community:
+                    <br/>
+
+                    <span style="display: inline-flex; align-items: center">
+                        <img src="assets/discord-mark-blue.svg" width="32px" style="margin-right: 8px"/>
+                        <b style="color: white">team-oze.org/discord</b>
+                    </span>
+                    <br/>
+                    <img src="assets/discord-qr.png" width="100px" style="border: 8px solid white"/>
+                </div>
+                <div style="min-height: 20px">
+                </div>
+                <div>
+                    <span style="color: gold">Shoutout to our supporters</span> ❤️<br/> Bob1, Bob2, Bob3, Bob4, Bob5
+                </div>
+                <div style="min-height: 20px">
+                </div>
+            </div>
+        </div>
+        <div id="gap">
+        </div>
+        <div id="pane-main" class="pane">
+            <div style="display: flex;">
+                <div id="w3c-banner-container">
+                    <img src="assets/dark-banner-%race%.png" class="set-race" id="w3c-banner"/>
+                    <img src="assets/w3c-logo-medium.png" id="w3c-logo"/>
+                </div>
+                <div id="w3c-text">
+                    <b style="margin-bottom: 8px; color: gold">Join W3Champions to be a cool guy 👑</b>
+                    <ul>
+                        <li><span>No more worrying about cheaters, corrupting maps and lost stats.</span></li>
+                        <li><span>Fair matchmaking with respect to centralised ELO.</span></li>
+                        <li><span>Climb the dedicated LTD ladders and become a Grandmaster, maybe even a Champion?!</span></li>
+                        <li><span>Wanna play with friends? We got you covered, queue up together as a team!</span></li>
+                    </ul>
+                    <br/>
+                    <span style="color: gold">Find out more</span> in the Discord, or at <b>w3champions.com</b>
+                </div>
+            </div>
+            <div class="divider" style="margin: 20px 0"></div>
+            <div style=" display: flex; flex-direction: column">
+                <div class="modepicker-title-container">
+                    <img src="assets/teams_title_bg.png" id="modepicker-title-bg"/>
+                    <div id="modepicker-title-text" style="color: gold">Game Setup</div>
+                </div>
+                <div class="modepicker-choices-container">
+                    <div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -PR: Random Prophet
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                The prophet gets re-rolled each wave
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?depressed" class="checkbox-frame"></iframe> -PH: Manual Prophet
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                <!-- TODO --> !TODO!
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -AP: All Pick
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                You may choose any prophet each wave
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -HB: Hybrid Builder
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                <!-- TODO --> !TODO!
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gap"></div>
+                    <div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?depressed" class="checkbox-frame"></iframe> -CC: Challenge Champions
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Each player may manually challenge a champion for themselves each level
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?" class="checkbox-frame"></iframe> -AC: Auto Champions
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Champions will spawn every wave after wave 4
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -NC: No Champions
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gap"></div>
+                    <div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -X1: Normal Mode
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Sends are not multiplied
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -X2: Double Trouble
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Sends are multiplied 2 times
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?depressed" class="checkbox-frame"></iframe> -X3: Triple Threat
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Sends are multiplied 3 times
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -X4: Quadruple Chaos
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Sends are multiplied 4 times
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div style="margin: 10px 0"></div>
+
+                <div class="modepicker-choices-container">
+                    <div style="flex-grow: 1"></div>
+                    <div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html" class="checkbox-frame"></iframe> -AH: Allow Hybrid
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Allow Hybrid Builder in PR/PH mode
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?checked" class="checkbox-frame"></iframe> -MI: Mirror Mode
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                <!-- TODO --> !TODO!
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gap"></div>
+                    <div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?" class="checkbox-frame"></iframe> -EZ: Easy Mode
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Wave damage is decreased, the King is more powerful
+                            </div>
+                        </div>
+                        <div class="modepicker-choice">
+                            <div class="modepicker-choice-control">
+                                <iframe src="components/checkbox.html?checked" class="checkbox-frame"></iframe> -HM: Hard Mode
+                            </div>
+                            <div class="modepicker-choice-desc">
+                                Wave damage is increased
+                            </div>
+                        </div>
+                    </div>
+                    <div style="flex-grow: 1"></div>
+                </div>
+            </div>
+
+            <div style="flex-grow: 1; margin: 20px 0">
+                <div class="divider"></div>
+            </div>
+
+            <div style="margin-bottom: 40px; display: flex; align-items: center; justify-content: center">
+                <div class="button-start">
+                    <img src="assets/wc3_btn_green_normal_4k.png"/>
+                    <div>Start Game</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
