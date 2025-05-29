@@ -1,0 +1,11 @@
+{
+  "name": "map-ui",
+  "version": "1.0.0",
+  "description": "",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "puppeteer": "^24.9.0"
+  }
+}
