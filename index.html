@@ -3,8 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <title>Team OZE</title>
+    <link rel="stylesheet" href="./index.css" />
+    <link rel="stylesheet" href="./fonts/friz-quadrata.css">
 </head>
 <body>
+<nav>
+    <div>
+        <img id="logo-image" src="./assets/oze-logo.svg" alt="Team OZE Logo" style="margin-right: 2rem"/>
+    </div>
+    <div>
 
+    </div>
+</nav>
+<div id="main-container">
+    <div id="content-container">
+        <h1 style="width: 100%; text-align: center" id="page-header">Welcome!</h1>
+        <hr style="margin-bottom: 20px; border: 2px solid gold"/>
+        <div style="display: flex; align-items: center; padding: 0 100px; justify-content: center">
+            <img src="./assets/warning-error-icon.png" style="height: 4rem; margin-right: 1rem;"/>
+            <p>
+                This will eventually become a multifunctional website dedicated to <b>Legion TD</b>, but for now we are just starting to work on it. In the meantime, please find some useful information below.
+            </p>
+        </div>
+        <div id="box" style="margin-top: 40px">
+            <div style="display: flex; justify-content: flex-start; margin-bottom: 20px">
+                <div style="height: 100%;  margin-right: 1rem; display: flex; justify-content: center; align-items: flex-start">
+                    <img src="./assets/minimap.png" style="height: 100%;"/>
+                </div>
+                <div style="height: 100%; flex-grow: 1">
+                    <h3 class="grid-entry-header">The Game</h3>
+                    <p class="grid-entry-content">
+                        <b>Legion TD</b> is a Warcraft III custom game, where teams of players build units to defend their mighty Kings against waves of demonic creatures. <br/>
+                        It features numerous gamemodes, such as different builder modes, varying difficulty levels and optional levels. <br/><br/>
+                    <div style="display: flex; align-items: center; margin-bottom: 8px">
+                        <img src="./assets/informational-icon-resting.png" style="height: 2em; margin-right: 0.5em">
+                        <span style="text-align: justify">Play it in Warcraft III Reforged now! Just download the latest version from <a href="https://maps.w3reforged.com/featured-maps/legion-td-team-oze">Reforged Maps</a> and get started!</span>
+                    </div>
+                    <div style="display: flex; align-items: center">
+                        <img src="./assets/informational-icon-resting.png" style="height: 2em; margin-right: 0.5em">
+                        <span style="text-align: justify">An overview of the units, waves and more is available in the <a href="https://wiki.team-oze.org">Wiki</a></span>
+                    </div>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <hr/>
+        <div id="grid" style="margin-top: 2rem">
+            <div class="content-section">
+                <div class="img_flag_responsive" race="human" style="height: 100%; display: flex; justify-content: center; align-items: center">
+                    <img src="./assets/social-menu-icon-resting.png" style="width: 50%; padding-bottom: 33%"/>
+                </div>
+                <div style="height: 100%">
+                    <h3 class="grid-entry-header">The Community</h3>
+                    <p class="grid-entry-content">
+                        Join the 11K+ LTD players out there to find friends and keep track of the latest news and developments.
+                        <br/><br/>
+                    <div class="links-list">
+                        <div>
+                            <div onclick="window.open('https://team-oze.org/discord', '_blank')">
+                                <img src="./assets/discord-mark-blue.svg" style="width: 1.5em"/>
+                            </div>
+                            <div>
+                                Join our <a target="_blank" href="https://team-oze.org/discord" style="color: #5865F2">Discord</a> - that's where all the action happens!
+                            </div>
+                        </div>
+                        <div>
+                            <div onclick="window.open('https://twitch.com/Team_OZE', '_blank')">
+                                <img src="./assets/glitch_flat_purple.svg" style="width: 1.5em"/>
+                            </div>
+                            <div>
+                                Follow us on <a target="_blank" href="https://twitch.com/Team_OZE" style="color: rgb(145 70 255)">Twitch</a> for game and chitchat streams and VODs!
+                            </div>
+                        </div>
+                        <div>
+                            <div onclick="window.open('https://patreon.com/teamoze', '_blank')">
+                                <img src="./assets/PATREON_SYMBOL_1_WHITE_RGB.svg" style="width: 1.5em"/>
+                            </div>
+                            <div>
+                                Support us on <a target="_blank" href="https://patreon.com/teamoze" style="color: #ff5900">Patreon</a> to help keep things running!
+                            </div>
+                        </div>
+                    </div>
+                    </p>
+                </div>
+            </div>
+            <div class="content-section">
+                <div style="height: 100%">
+                    <h3 class="grid-entry-header">Events</h3>
+                    <p class="grid-entry-content">
+                        We hold a few tournaments a year in different formats and modes - from intivationals to open funtours.
+                        <br/><br/>
+                        Signups are currently open for the <a href="https://matcherino.com/tournaments/152929">4v4 Summer Brawl</a>.
+                        Don't miss out on the chance to take home a piece of the <span style="color: gold">$1K+ prizepool</span>!
+                    </p>
+                </div>
+                <div class="img_flag_responsive" race="horde" style="height: 100%; display: flex; justify-content: center; align-items: center">
+                    <img src="./assets/tournament-icon-up.png" style="width: 50%; padding-bottom: 33%"/>
+                </div>
+            </div>
+            <div class="content-section grid-span-2">
+                <div style="height: 100%; margin-right: 10px; display: flex; justify-content: center; align-items: flex-start">
+                    <div class="img_flag_responsive" race="nightelf" style="height: 100%; display: flex; justify-content: center; align-items: center">
+                        <img src="./assets/crown-icon.png" style="width: 50%; padding-bottom: 33%"/>
+                    </div>
+                </div>
+                <div style="height: 100%">
+                    <h3 class="grid-entry-header">W3Champions - Legion TD Ladder</h3>
+                    <p class="grid-entry-content">
+                        There is an official Legion TD ladder on <a href="https://w3champions.com">W3Champions</a>.
+                        <br/>
+                        It currently features <i style="color: gold">pracmi</i> and <i style="color: gold">prccx3</i> modes.
+                        <br/><br/>
+                        W3Champions is a secure environment to play Warcraft III: Reforged. Some of the platform's features include:
+                        <ul style="list-style-position: inside; padding-left: 1.5em; margin-top: 8px">
+                            <li><b>Verified and updated maps</b> - no hacked maps that cause you to lose your stats and crash all the time.</li>
+                            <li><b>A competitive ladder</b> - a centralised ranking and a robust system for fair matchmaking. Server-stored stats make sure you will never lose your progress!</li>
+                            <li><b>Moderation</b> - no more pesky leavers! You can submit reports against offenses in your ladder games. </li>
+                            <li><b>Statistics</b> - games on the platform are recorded and further statistcs on your performance and general trends are available through the W3Champions website and, in the future, far more - on this website.</li>
+                            <li>... and more</li>
+                        </ul>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>

@@ -1,0 +1,214 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+html, body {
+    width: 100vw;
+    height: 100vh;
+}
+body {
+    font-family: "Friz Quadrata";
+    color: white;
+    font-size: 18pt;
+    display: flex;
+    flex-direction: column;
+}
+
+nav {
+    display: flex;
+    height: 6rem;
+    @media (min-height: 1000px) {
+        min-height: 7vh;
+    }
+    background: #000;
+    div {
+        display: flex;
+        align-items: center;
+        height: 100%;
+    }
+
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    z-index: 100;
+}
+
+nav, #main-container {
+    padding: 0 max((100vw - 1200px) / 2, 2rem);
+    @media (min-width: 800px) {
+        padding: 0 max((100vw - 1200px) / 2, 4rem);
+    }
+}
+
+#logo-image {
+    height: 45%;
+}
+
+#main-container {
+    overflow: hidden;
+    position: relative;
+    flex-grow: 1;
+    display: flex;
+}
+
+#main-container::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-image: url("./assets/oze-banner.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: grayscale(1) brightness(20%);
+}
+
+#content-container::-webkit-scrollbar {
+    display: none;
+}
+#content-container {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    overflow-y: auto;
+    padding-top: 8rem;
+    @media (min-height: 1000px) {
+        padding-top: max(7vh + 2rem, 8rem);
+    }
+    width: 100%;
+    position: relative;
+    padding-bottom: 2rem;
+}
+
+h1, h3 {
+    color: gold;
+}
+
+#box {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: 1fr;
+    gap: 0.5rem 2rem;
+}
+
+.content-section {
+    display: flex;
+    align-items: flex-start;
+}
+
+.grid-entry-header {
+    margin-bottom: 4px;
+}
+
+.grid-entry-content {
+    text-align: justify;
+}
+
+:link {
+    color: palegoldenrod;
+    text-decoration: none;
+}
+
+.links-list {
+    > div {
+        display: flex;
+        padding: 2px 0;
+        > div:first-child {
+            > img {
+                cursor: pointer;
+            }
+            display: flex;
+            align-items: center;
+            width: 2em;
+            min-width: 2.5em;
+        }
+    }
+}
+
+#grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 2rem 0;
+
+    > div {
+        aspect-ratio: 1 / .4;
+        @media (min-width: 1000px) {
+            aspect-ratio: 1 / .8;
+        }
+        @media (max-width: 1000px) {
+            &:nth-child(2n+1) {
+                margin-right: 1rem;
+            }
+            &:nth-child(2n) {
+                margin-left: 1rem;
+            }
+        }
+        &:not(:last-child) {
+            border-bottom: 1px solid silver;
+        }
+    }
+    @media (min-width: 1000px) {
+        gap: 2rem 4rem;
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.img_flag_responsive {
+    background-repeat: no-repeat;
+    background-position: top center;
+    @media (min-width: 1000px) {
+        aspect-ratio: 812/1470;
+        background-size: contain;
+        &[race="horde"] {
+            background-image: url("./assets/wc3_victoryscreen_banner_horde.png");
+        }
+        &[race="human"] {
+            background-image: url("./assets/wc3_victoryscreen_banner_human.png");
+        }
+        &[race="nightelf"] {
+            background-image: url("./assets/wc3_victoryscreen_banner_nightelf.png");
+        }
+        &[race="undead"] {
+            background-image: url("./assets/wc3_victoryscreen_banner_undead.png");
+        }
+    }
+    @media (max-width: 1000px) {
+        aspect-ratio: 329/402;
+        background-size: contain;
+        &[race="horde"] {
+            background-image: url("./assets/queue-race-banner-orc.png");
+        }
+        &[race="human"] {
+            background-image: url("./assets/queue-race-banner-hm.png");
+        }
+        &[race="nightelf"] {
+            background-image: url("./assets/queue-race-banner-ne.png");
+        }
+        &[race="undead"] {
+            background-image: url("./assets/queue-race-banner-ud.png");
+        }
+    }
+}
+
+.img_flag_big {
+    aspect-ratio: 812/1470;
+    background-size: contain;
+    &[race="horde"] {
+        background-image: url("./assets/wc3_victoryscreen_banner_human.png");
+    }
+    &[race="human"] {
+        background-image: url("./assets/wc3_victoryscreen_banner_horde.png");
+    }
+    &[race="nightelf"] {
+        background-image: url("./assets/wc3_victoryscreen_banner_nightelf.png");
+    }
+    &[race="undead"] {
+        background-image: url("./assets/wc3_victoryscreen_banner_undead.png");
+    }
+}
+
+.grid-span-2 {
+    @media (min-width: 1000px) {
+        grid-column: span 2; aspect-ratio: 1 / .4 !important;
+    }
+}
