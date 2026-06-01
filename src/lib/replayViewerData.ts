@@ -697,7 +697,11 @@ export async function getReplayViewerData(id: string): Promise<ReplayViewerData 
       unitSendRows,
       unitUpgradeRows
     }),
-    waveEvents: buildWaveEvents(sendDetailsRows, playerStatRows, unitSendRows)
+    waveEvents: buildWaveEvents(sendDetailsRows, playerStatRows, unitSendRows, {
+      buildRows,
+      unitSellRows,
+      unitUpgradeRows
+    })
   };
 }
 
@@ -1000,10 +1004,19 @@ const WAVE_START_CLUSTER_MILLIS = 2000;
 function buildWaveEvents(
   sendDetailsRows: ReplaySendDetailsRow[],
   playerStatRows: ReplayPlayerStatRow[],
-  unitSendRows: ReplayUnitSendRow[]
+  unitSendRows: ReplayUnitSendRow[],
+  buildPhaseRows: {
+    buildRows: ReplayBuildRow[];
+    unitSellRows: ReplayUnitSellRow[];
+    unitUpgradeRows: ReplayUnitUpgradeRow[];
+  }
 ): ReplayWaveEvent[] {
   const waveStartGroups = clusterRowsByTime(sendDetailsRows, WAVE_START_CLUSTER_MILLIS);
   const levelEndMillis = new Map<number, number>();
+  const buildPhaseActionMillis = [...buildPhaseRows.buildRows, ...buildPhaseRows.unitUpgradeRows, ...buildPhaseRows.unitSellRows]
+    .map((row) => Number(row.timeMillis))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
 
   for (const row of playerStatRows) {
     const level = Number(row.levelNumber);
@@ -1015,6 +1028,10 @@ function buildWaveEvents(
     const level = index + 1;
     const creep = waveCreepForLevel(level);
     const startMillis = Math.min(...group.map((row) => Number(row.timeMillis)));
+    const nextStartMillis =
+      index + 1 < waveStartGroups.length ? Math.min(...waveStartGroups[index + 1].map((row) => Number(row.timeMillis))) : Number.POSITIVE_INFINITY;
+    const statEndMillis = levelEndMillis.get(level) ?? null;
+    const firstBuildPhaseMillis = buildPhaseActionMillis.find((timeMillis) => timeMillis > startMillis && timeMillis < nextStartMillis);
     const previousStartMillis = index > 0 ? Math.min(...waveStartGroups[index - 1].map((row) => Number(row.timeMillis))) : 0;
     const unitSendsForWave = unitSendRows.filter((row) => {
       const timeMillis = Number(row.timeMillis);
@@ -1037,7 +1054,10 @@ function buildWaveEvents(
     return {
       level,
       startMillis,
-      endMillis: levelEndMillis.get(level) ?? null,
+      endMillis:
+        statEndMillis !== null && firstBuildPhaseMillis !== undefined && firstBuildPhaseMillis < statEndMillis
+          ? firstBuildPhaseMillis
+          : statEndMillis,
       creepName: creep?.unitName ?? null,
       creep,
       description: null,
