@@ -586,9 +586,16 @@ function parseSeekSeconds(value: string | null) {
 }
 
 function formatSeekSeconds(milliseconds: number) {
-  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const millis = Math.max(0, Math.round(milliseconds));
 
-  return String(seconds);
+  if (millis % 1000 === 0) {
+    return String(millis / 1000);
+  }
+
+  return (millis / 1000)
+    .toFixed(3)
+    .replace(/0+$/, "")
+    .replace(/\.$/, "");
 }
 
 function viewerSessionFromLocation() {
@@ -826,7 +833,7 @@ function ReplayViewerModal({
 
   const iframeParams = new URLSearchParams({
     replayGameId: viewer.replayGameId,
-    s: String(Math.max(0, Math.floor(viewer.initialSeekSeconds)))
+    s: formatSeekSeconds(viewer.initialSeekSeconds * 1000)
   });
 
   return (
@@ -1737,7 +1744,7 @@ function GamesView() {
 
   React.useEffect(() => {
     const initialSession = viewerSessionFromLocation();
-    const initialSeekSeconds = initialSession ? String(Math.max(0, Math.floor(initialSession.initialSeekSeconds))) : null;
+    const initialSeekSeconds = initialSession ? formatSeekSeconds(initialSession.initialSeekSeconds * 1000) : null;
 
     viewerReplayGameIdRef.current = initialSession?.replayGameId ?? null;
     lastViewerSeekRef.current = initialSeekSeconds;
@@ -1751,7 +1758,7 @@ function GamesView() {
       const session = viewerSessionFromLocation();
 
       viewerReplayGameIdRef.current = session?.replayGameId ?? null;
-      lastViewerSeekRef.current = session ? String(Math.max(0, Math.floor(session.initialSeekSeconds))) : null;
+      lastViewerSeekRef.current = session ? formatSeekSeconds(session.initialSeekSeconds * 1000) : null;
       setViewerSession(session);
     }
 

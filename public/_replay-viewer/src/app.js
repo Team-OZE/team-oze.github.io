@@ -130,9 +130,11 @@ const PLAYER_CORNER_ROLL_ICON_CELL_SCALE = 0.88;
 const PLAYER_CORNER_ROLL_ICON_ZOOM_BOOST_PX = 6;
 const REPLAY_CONTROLS_BASE_TARGET_WIDTH_PX = 590;
 const REPLAY_CONTROLS_FIXED_TRACKS_PX = 410;
-const REPLAY_LEVEL_ANCHOR_MIN_WIDTH_PX = 18;
-const REPLAY_LEVEL_SEPARATOR_WIDTH_PX = 8;
-const REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS = 1000;
+const REPLAY_LEVEL_ANCHOR_MIN_WIDTH_PX = 20;
+const REPLAY_LEVEL_SEPARATOR_WIDTH_PX = 0;
+const REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS = 75;
+const REPLAY_RANGE_THUMB_SIZE_PX = 18;
+const REPLAY_TIMELINE_RANGE_STEPS = 100000;
 const PREP_EVENT_TYPES = new Set(["UNIT_BUILD", "UNIT_UPGRADE", "UNIT_SELL", "LUMBER_WISP", "LUMBER_UPGRADE"]);
 // The replay action stream only records trained wisps; every player starts with one.
 const BASE_WISP_COUNT = 1;
@@ -262,8 +264,14 @@ function parseReplaySeekMillis(value) {
   return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0;
 }
 
-function replaySeekParamForMillis(milliseconds) {
-  return String(Math.max(0, Math.floor((Number(milliseconds) || 0) / 1000)));
+function replaySeekParamForMillis(milliseconds, { precise = true } = {}) {
+  const millis = Math.max(0, Math.round(Number(milliseconds) || 0));
+  if (!precise) return String(Math.floor(millis / 1000));
+  if (millis % 1000 === 0) return String(millis / 1000);
+  return (millis / 1000)
+    .toFixed(3)
+    .replace(/0+$/, "")
+    .replace(/\.$/, "");
 }
 
 function currentReplayUrlId() {
@@ -275,7 +283,7 @@ function publishReplayTime() {
 
   if (!replayGameId) return;
 
-  const seekParam = replaySeekParamForMillis(state.timeMillis);
+  const seekParam = replaySeekParamForMillis(state.timeMillis, { precise: state.playbackHandle === undefined });
 
   if (replayGameId === lastPublishedReplayId && seekParam === lastPublishedSeekParam) {
     return;
@@ -2688,7 +2696,8 @@ function downloadLoadStateFile() {
 
 function configureReplayControls(durationMillis) {
   state.durationMillis = Math.max(0, Math.round(durationMillis));
-  replayTime.max = String(state.durationMillis);
+  replayTime.max = String(REPLAY_TIMELINE_RANGE_STEPS);
+  replayTime.step = "1";
   replayDuration.value = formatReplayTime(state.durationMillis);
   replayDuration.textContent = formatReplayTime(state.durationMillis);
   renderLevelAnchors();
@@ -2699,18 +2708,18 @@ function replayLevelAnchors() {
   const waves = state.replayIndex.waveEvents || [];
   const levelEndMillis = new Map();
 
-  for (const stat of state.replay?.playerStats || []) {
-    const level = Number(stat.levelNumber);
-    const timeMillis = Number(stat.timeMillis);
-    if (!Number.isFinite(level) || !Number.isFinite(timeMillis)) continue;
-    levelEndMillis.set(level, Math.max(levelEndMillis.get(level) ?? 0, timeMillis));
-  }
-
   for (const wave of waves) {
     const level = Number(wave.level);
     const endMillis = wave.endMillis === null || wave.endMillis === undefined ? Number.NaN : Number(wave.endMillis);
     if (!Number.isFinite(level) || !Number.isFinite(endMillis)) continue;
-    levelEndMillis.set(level, Math.max(levelEndMillis.get(level) ?? 0, endMillis));
+    levelEndMillis.set(level, endMillis);
+  }
+
+  for (const stat of state.replay?.playerStats || []) {
+    const level = Number(stat.levelNumber);
+    const timeMillis = Number(stat.timeMillis);
+    if (!Number.isFinite(level) || !Number.isFinite(timeMillis) || levelEndMillis.has(level)) continue;
+    levelEndMillis.set(level, Math.max(levelEndMillis.get(level) ?? 0, timeMillis));
   }
 
   const maxLevel = Math.max(0, ...waves.map((wave) => Number(wave.level)).filter(Number.isFinite), ...levelEndMillis.keys());
@@ -2721,7 +2730,7 @@ function replayLevelAnchors() {
     if (!Number.isFinite(timeMillis)) continue;
     anchors.push({
       level,
-      timeMillis: clamp(Math.round(timeMillis + 1), 0, state.durationMillis || 0),
+      timeMillis: clamp(Math.round(timeMillis), 0, state.durationMillis || 0),
     });
   }
 
@@ -2733,6 +2742,80 @@ function replayLevelOutcomeLevelAtTime(timeMillis) {
   if (!Number.isFinite(millis)) return undefined;
 
   return replayLevelAnchors().find((anchor) => Math.abs(Number(anchor.timeMillis) - millis) <= REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS)?.level;
+}
+
+function replayTimelineProgressForTime(timeMillis) {
+  const anchors = replayLevelAnchors();
+  if (!anchors.length) {
+    const duration = Math.max(1, Number(state.durationMillis) || 1);
+    return clamp((Number(timeMillis) || 0) / duration, 0, 1);
+  }
+
+  const millis = clamp(Number(timeMillis) || 0, 0, state.durationMillis || 0);
+  const segmentCount = anchors.length;
+  let previousTime = 0;
+  let previousProgress = 0;
+
+  for (const [index, anchor] of anchors.entries()) {
+    const anchorTime = Number(anchor.timeMillis);
+    const anchorProgress = (index + 1) / segmentCount;
+    if (!Number.isFinite(anchorTime)) continue;
+
+    if (millis <= anchorTime) {
+      const span = anchorTime - previousTime;
+      const localProgress = span > 0 ? clamp((millis - previousTime) / span, 0, 1) : 1;
+      return previousProgress + (anchorProgress - previousProgress) * localProgress;
+    }
+
+    previousTime = anchorTime;
+    previousProgress = anchorProgress;
+  }
+
+  return 1;
+}
+
+function replayTimelineTimeForProgress(progress) {
+  const anchors = replayLevelAnchors();
+  const normalizedProgress = clamp(Number(progress) || 0, 0, 1);
+  if (!anchors.length) return normalizedProgress * (state.durationMillis || 0);
+
+  const segmentCount = anchors.length;
+  let previousTime = 0;
+  let previousProgress = 0;
+
+  for (const [index, anchor] of anchors.entries()) {
+    const anchorTime = Number(anchor.timeMillis);
+    const anchorProgress = (index + 1) / segmentCount;
+    if (!Number.isFinite(anchorTime)) continue;
+
+    if (normalizedProgress <= anchorProgress) {
+      const progressSpan = anchorProgress - previousProgress;
+      const localProgress = progressSpan > 0 ? clamp((normalizedProgress - previousProgress) / progressSpan, 0, 1) : 1;
+      return previousTime + (anchorTime - previousTime) * localProgress;
+    }
+
+    previousTime = anchorTime;
+    previousProgress = anchorProgress;
+  }
+
+  return state.durationMillis || previousTime;
+}
+
+function replayTimelineInputValueForTime(timeMillis) {
+  return Math.round(replayTimelineProgressForTime(timeMillis) * REPLAY_TIMELINE_RANGE_STEPS);
+}
+
+function replayTimelineTimeForInputValue(value) {
+  return replayTimelineTimeForProgress((Number(value) || 0) / REPLAY_TIMELINE_RANGE_STEPS);
+}
+
+function replayTimelinePosition(timeMillis) {
+  const progress = replayTimelineProgressForTime(timeMillis);
+  const percent = Math.round(progress * 100000) / 1000;
+  const offset = Math.round((0.5 - progress) * REPLAY_RANGE_THUMB_SIZE_PX * 1000) / 1000;
+
+  if (Math.abs(offset) < 0.001) return `${percent}%`;
+  return `calc(${percent}% ${offset < 0 ? "-" : "+"} ${Math.abs(offset)}px)`;
 }
 
 function updateReplayControlsTargetWidth(anchors) {
@@ -2751,29 +2834,18 @@ function renderLevelAnchors() {
   if (!levelAnchors) return;
 
   const anchors = replayLevelAnchors();
-  const durationMillis = Math.max(1, Number(state.durationMillis) || 1);
   updateReplayControlsTargetWidth(anchors);
   levelAnchors.replaceChildren();
   levelAnchors.hidden = anchors.length === 0;
+  levelAnchors.style.setProperty("--level-anchor-count", String(Math.max(1, anchors.length)));
 
   if (!anchors.length) return;
 
-  for (const [index, anchor] of anchors.entries()) {
-    if (index > 0) {
-      const separator = document.createElement("span");
-      separator.className = "level-anchors__separator";
-      const previousAnchor = anchors[index - 1];
-      const midpoint = (Number(previousAnchor.timeMillis) + Number(anchor.timeMillis)) / 2;
-      separator.style.setProperty("--level-anchor-position", `${clamp((midpoint / durationMillis) * 100, 0, 100)}%`);
-      separator.textContent = "|";
-      levelAnchors.appendChild(separator);
-    }
-
+  for (const anchor of anchors) {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.level = String(anchor.level);
     button.dataset.timeMillis = String(anchor.timeMillis);
-    button.style.setProperty("--level-anchor-position", `${clamp((Number(anchor.timeMillis) / durationMillis) * 100, 0, 100)}%`);
     button.textContent = String(anchor.level);
     button.title = `Go to level ${anchor.level} outcome (${formatReplayTime(anchor.timeMillis)})`;
     button.setAttribute("aria-label", `Go to level ${anchor.level} outcome at ${formatReplayTime(anchor.timeMillis)}`);
@@ -2863,7 +2935,8 @@ function formatReplayCompactTime(milliseconds) {
 
 function setReplayTime(milliseconds) {
   state.timeMillis = clamp(Math.round(milliseconds), 0, state.durationMillis || 0);
-  replayTime.value = String(state.timeMillis);
+  replayTime.value = String(replayTimelineInputValueForTime(state.timeMillis));
+  replayTime.style.setProperty("--replay-progress-position", replayTimelinePosition(state.timeMillis));
   replayCurrentTime.value = formatReplayTime(state.timeMillis);
   replayCurrentTime.textContent = formatReplayTime(state.timeMillis);
   updateWaveStatus();
@@ -2919,7 +2992,13 @@ function waveForLevel(level) {
 
 function reviewWaveLevelAtTime(timeMillis = state.timeMillis) {
   const explicitLevel = Number(state.prepHighlightWaveLevel);
-  if (Number.isFinite(explicitLevel)) return explicitLevel;
+  if (Number.isFinite(explicitLevel)) {
+    const anchor = replayLevelAnchors().find((item) => Number(item.level) === explicitLevel);
+    const anchorTimeMillis = Number(anchor?.timeMillis);
+    if (Number.isFinite(anchorTimeMillis) && Math.abs(anchorTimeMillis - Number(timeMillis)) <= REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS) {
+      return explicitLevel;
+    }
+  }
   if (state.playbackHandle !== undefined) return undefined;
   return replayLevelOutcomeLevelAtTime(timeMillis);
 }
@@ -6109,7 +6188,7 @@ for (const button of iconModeButtons) {
 }
 replayTime.addEventListener("input", () => {
   state.prepHighlightWaveLevel = undefined;
-  seekReplayTime(Number(replayTime.value));
+  seekReplayTime(replayTimelineTimeForInputValue(Number(replayTime.value)));
 });
 levelAnchors?.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-time-millis]");
