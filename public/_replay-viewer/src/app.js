@@ -1654,9 +1654,13 @@ function desiredFrameSize(zoom = state.zoom) {
 function clampFrame(frame) {
   const width = clamp(frame.width, 1, RENDER_BOUNDS.width);
   const height = clamp(frame.height, 1, RENDER_BOUNDS.height);
+  const minX = RENDER_BOUNDS.x - width / 2;
+  const maxX = RENDER_BOUNDS.x + RENDER_BOUNDS.width - width / 2;
+  const minY = RENDER_BOUNDS.y - height / 2;
+  const maxY = RENDER_BOUNDS.y + RENDER_BOUNDS.height - height / 2;
   return {
-    x: clamp(frame.x, RENDER_BOUNDS.x, RENDER_BOUNDS.x + RENDER_BOUNDS.width - width),
-    y: clamp(frame.y, RENDER_BOUNDS.y, RENDER_BOUNDS.y + RENDER_BOUNDS.height - height),
+    x: clamp(frame.x, minX, maxX),
+    y: clamp(frame.y, minY, maxY),
     width,
     height,
   };
@@ -2179,7 +2183,7 @@ function drawMap() {
   const rect = fitCanvas(canvas, context);
   const current = frame();
   const cellSize = rect.width / current.width;
-  context.fillStyle = "#0b0d0b";
+  context.fillStyle = "#000";
   context.fillRect(0, 0, rect.width, rect.height);
 
   const minX = Math.floor(current.x) - 1;
@@ -2188,8 +2192,10 @@ function drawMap() {
   const maxY = Math.ceil(current.y + current.height) + 1;
 
   for (let y = minY; y <= maxY; y += 1) {
+    if (y < RENDER_BOUNDS.y || y >= RENDER_BOUNDS.y + RENDER_BOUNDS.height) continue;
     if (y < 0 || y >= mapData.cellsY) continue;
     for (let renderX = minX; renderX <= maxX; renderX += 1) {
+      if (renderX < RENDER_BOUNDS.x || renderX >= RENDER_BOUNDS.x + RENDER_BOUNDS.width) continue;
       const mapX = renderCellToMapCell(renderX);
       if (mapX < 0 || mapX >= mapData.cellsX) continue;
       drawCell(context, mapX, y, (renderX - current.x) * cellSize, (y - current.y) * cellSize, cellSize);
@@ -2285,18 +2291,27 @@ function drawMinimap() {
   drawMinimapSidePocketGrids(minimapContext, sx, sy, rect.width, rect.height);
   drawMinimapSideLaneFill(minimapContext, sx, sy, rect.width, rect.height);
 
-  const viewX = current.x - RENDER_BOUNDS.x;
-  const viewY = current.y - RENDER_BOUNDS.y;
-  minimapContext.fillStyle = "rgba(255, 237, 146, 0.1)";
-  minimapContext.strokeStyle = "#fff1a0";
-  minimapContext.lineWidth = 2;
-  minimapContext.fillRect(viewX * sx, viewY * sy, current.width * sx, current.height * sy);
-  minimapContext.strokeRect(
-    viewX * sx + 1,
-    viewY * sy + 1,
-    Math.max(4, current.width * sx - 2),
-    Math.max(4, current.height * sy - 2),
-  );
+  const viewLeft = Math.max(current.x, RENDER_BOUNDS.x);
+  const viewTop = Math.max(current.y, RENDER_BOUNDS.y);
+  const viewRight = Math.min(current.x + current.width, RENDER_BOUNDS.x + RENDER_BOUNDS.width);
+  const viewBottom = Math.min(current.y + current.height, RENDER_BOUNDS.y + RENDER_BOUNDS.height);
+
+  if (viewRight > viewLeft && viewBottom > viewTop) {
+    const viewX = viewLeft - RENDER_BOUNDS.x;
+    const viewY = viewTop - RENDER_BOUNDS.y;
+    const viewWidth = viewRight - viewLeft;
+    const viewHeight = viewBottom - viewTop;
+    minimapContext.fillStyle = "rgba(255, 237, 146, 0.1)";
+    minimapContext.strokeStyle = "#fff1a0";
+    minimapContext.lineWidth = 2;
+    minimapContext.fillRect(viewX * sx, viewY * sy, viewWidth * sx, viewHeight * sy);
+    minimapContext.strokeRect(
+      viewX * sx + 1,
+      viewY * sy + 1,
+      Math.max(4, viewWidth * sx - 2),
+      Math.max(4, viewHeight * sy - 2),
+    );
+  }
 }
 
 function draw() {
