@@ -133,6 +133,7 @@ const REPLAY_CONTROLS_FIXED_TRACKS_PX = 410;
 const REPLAY_LEVEL_ANCHOR_MIN_WIDTH_PX = 18;
 const REPLAY_LEVEL_SEPARATOR_WIDTH_PX = 8;
 const REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS = 1000;
+const PREP_EVENT_TYPES = new Set(["UNIT_BUILD", "UNIT_UPGRADE", "UNIT_SELL", "LUMBER_WISP", "LUMBER_UPGRADE"]);
 // The replay action stream only records trained wisps; every player starts with one.
 const BASE_WISP_COUNT = 1;
 const DEFAULT_WAVE_CREEP_COUNT = 100;
@@ -2735,6 +2736,7 @@ function renderLevelAnchors() {
   if (!levelAnchors) return;
 
   const anchors = replayLevelAnchors();
+  const durationMillis = Math.max(1, Number(state.durationMillis) || 1);
   updateReplayControlsTargetWidth(anchors);
   levelAnchors.replaceChildren();
   levelAnchors.hidden = anchors.length === 0;
@@ -2745,6 +2747,9 @@ function renderLevelAnchors() {
     if (index > 0) {
       const separator = document.createElement("span");
       separator.className = "level-anchors__separator";
+      const previousAnchor = anchors[index - 1];
+      const midpoint = (Number(previousAnchor.timeMillis) + Number(anchor.timeMillis)) / 2;
+      separator.style.setProperty("--level-anchor-position", `${clamp((midpoint / durationMillis) * 100, 0, 100)}%`);
       separator.textContent = "|";
       levelAnchors.appendChild(separator);
     }
@@ -2753,6 +2758,7 @@ function renderLevelAnchors() {
     button.type = "button";
     button.dataset.level = String(anchor.level);
     button.dataset.timeMillis = String(anchor.timeMillis);
+    button.style.setProperty("--level-anchor-position", `${clamp((Number(anchor.timeMillis) / durationMillis) * 100, 0, 100)}%`);
     button.textContent = String(anchor.level);
     button.title = `Go to level ${anchor.level} outcome (${formatReplayTime(anchor.timeMillis)})`;
     button.setAttribute("aria-label", `Go to level ${anchor.level} outcome at ${formatReplayTime(anchor.timeMillis)}`);
@@ -2905,6 +2911,20 @@ function reviewWaveLevelAtTime(timeMillis = state.timeMillis) {
 
 function reviewWaveAtTime(timeMillis = state.timeMillis) {
   return waveForLevel(reviewWaveLevelAtTime(timeMillis));
+}
+
+function buildSnapshotWaveAtTime(timeMillis = state.timeMillis) {
+  const reviewWave = reviewWaveAtTime(timeMillis);
+  if (reviewWave) return reviewWave;
+
+  const status = waveStatusAtTime(timeMillis);
+  return status.phase === "wave" ? status.wave : undefined;
+}
+
+function buildSnapshotTimeAt(timeMillis = state.timeMillis) {
+  const wave = buildSnapshotWaveAtTime(timeMillis);
+  const startMillis = Number(wave?.startMillis);
+  return Number.isFinite(startMillis) ? startMillis : timeMillis;
 }
 
 function previousWaveForLevel(level) {
@@ -3275,7 +3295,7 @@ function playerWaveOutcome(playerId, wave) {
   const hasExtraIncoming = sendCount > 0 || challengeCount > 0;
 
   if (leaks <= 0) {
-    const parts = [{ text: "Clear", tone: "good" }];
+    const parts = [{ text: `Clear vs ${incomingBreakdownText(creepCount, sendCount, challengeCount)}`, tone: "good" }];
     if (challengeCount > 0) parts.push({ text: "Killed CC", tone: "good" });
     return {
       level,
@@ -3893,6 +3913,69 @@ function playerWispCountAt(playerId, timeMillis = state.timeMillis) {
   return BASE_WISP_COUNT + countAtOrBefore(economyEvents, timeMillis, (event) => event.type === "LUMBER_WISP");
 }
 
+function buildStateChangesForEvent(event) {
+  return event.stateChanges?.length
+    ? event.stateChanges
+    : [
+        {
+          actionId: event.actionId,
+          timeMillis: event.timeMillis,
+          level: 1,
+          unitType: event.unitType,
+          unitName: event.unitName || event.unitType,
+          goldCost: event.goldCost,
+          totalGoldCost: event.totalGoldCost,
+          sellGold: event.sellGold,
+          upgradeGroup: event.upgradeGroup,
+          iconPath: event.iconPath,
+          description: event.description,
+          stats: event.stats,
+        },
+      ];
+}
+
+function buildEventStateAt(event, timeMillis) {
+  let current;
+
+  for (const change of buildStateChangesForEvent(event)) {
+    if (Number(change.timeMillis) > Number(timeMillis)) break;
+    current = change;
+  }
+
+  return current;
+}
+
+function buildEventIsActiveAt(event, timeMillis) {
+  const builtAtMillis = Number(event.timeMillis);
+  if (!Number.isFinite(builtAtMillis) || builtAtMillis > Number(timeMillis)) return false;
+
+  const removedAtMillis = event.removedAtMillis === null || event.removedAtMillis === undefined ? undefined : Number(event.removedAtMillis);
+  return !Number.isFinite(removedAtMillis) || removedAtMillis > Number(timeMillis);
+}
+
+function buildStateGoldValue(buildState) {
+  const value = Number(buildState?.totalGoldCost ?? buildState?.stats?.gold ?? buildState?.goldCost);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function playerBoardValueAt(playerId, timeMillis = state.timeMillis) {
+  let total = 0;
+  let hasValue = false;
+
+  for (const event of state.replay?.buildUnits ?? []) {
+    if (Number(event.playerId) !== Number(playerId)) continue;
+    if (!buildEventIsActiveAt(event, timeMillis)) continue;
+
+    const buildState = buildEventStateAt(event, timeMillis);
+    if (!buildState) continue;
+
+    total += buildStateGoldValue(buildState);
+    hasValue = true;
+  }
+
+  return hasValue ? total : undefined;
+}
+
 function playerResourceStatsAt(playerId, timeMillis = state.timeMillis) {
   const statRows = state.replayIndex.statsByPlayer.get(Number(playerId)) || [];
   const resourceEvents = state.replayIndex.resourcesByPlayer.get(Number(playerId)) || [];
@@ -3976,9 +4059,11 @@ function playerCurrentStats(playerId) {
   const statRows = state.replayIndex.statsByPlayer.get(Number(playerId)) || [];
   const { current: stats, previous } = snapshotPairAtOrBefore(statRows);
   const economyEvents = state.replayIndex.economyByPlayer.get(Number(playerId)) || [];
-  const resourceStats = playerResourceStatsAt(playerId);
-  const wisps = playerWispCountAt(playerId);
-  const lumberUpgrades = countAtOrBefore(economyEvents, state.timeMillis, (event) => event.type === "LUMBER_UPGRADE");
+  const buildStatsTime = buildSnapshotTimeAt();
+  const resourceStats = playerResourceStatsAt(playerId, buildStatsTime);
+  const wisps = playerWispCountAt(playerId, buildStatsTime);
+  const lumberUpgrades = countAtOrBefore(economyEvents, buildStatsTime, (event) => event.type === "LUMBER_UPGRADE");
+  const boardValue = playerBoardValueAt(playerId, buildStatsTime);
   const totalLeaks = stats?.leakedAmountCumulative;
   const previousLeaks = previous?.leakedAmountCumulative ?? 0;
   const totalCaught = stats?.leaksCaught;
@@ -3996,16 +4081,16 @@ function playerCurrentStats(playerId) {
     currentLeaks,
     totalLeaks,
     leaks: totalLeaks,
-    value: stats?.value,
+    value: boardValue ?? stats?.value,
     bounty: resourceStats.bounty,
     leaksCaught: stats?.leaksCaught,
     currentCaught,
     totalCaught,
     lumberUpgrades,
-    builtUnits: countPlayerEventsAtOrBefore(playerId, "UNIT_BUILD"),
-    upgrades: countPlayerEventsAtOrBefore(playerId, "UNIT_UPGRADE"),
+    builtUnits: countPlayerEventsAtOrBefore(playerId, "UNIT_BUILD", buildStatsTime),
+    upgrades: countPlayerEventsAtOrBefore(playerId, "UNIT_UPGRADE", buildStatsTime),
     sends: countPlayerEventsAtOrBefore(playerId, "UNIT_SEND"),
-    sells: countPlayerEventsAtOrBefore(playerId, "UNIT_SELL"),
+    sells: countPlayerEventsAtOrBefore(playerId, "UNIT_SELL", buildStatsTime),
     challenges: countPlayerEventsAtOrBefore(playerId, "CHAMPION_CHALLENGED"),
   };
 }
@@ -4211,11 +4296,15 @@ function updateEndgameOverlay() {
 
 function playerTimelineEvents(playerId, timeMillis = state.timeMillis) {
   const sourceEvents = state.replayIndex.eventsByPlayer.get(Number(playerId)) || [];
+  const buildStatsTime = buildSnapshotTimeAt(timeMillis);
   const events = [];
 
   for (let index = sourceEvents.length - 1; index >= 0; index -= 1) {
     const event = sourceEvents[index];
-    if (Number(event.timeMillis) <= timeMillis) events.push(event);
+    const eventTimeMillis = Number(event.timeMillis);
+    if (eventTimeMillis > Number(timeMillis)) continue;
+    if (PREP_EVENT_TYPES.has(event.type) && eventTimeMillis > buildStatsTime) continue;
+    events.push(event);
   }
 
   return events;
@@ -5034,9 +5123,17 @@ function unitStateForToken(token, timeMillis = state.timeMillis) {
   return current || token;
 }
 
-function updateUnitTokenForTime(token) {
+function tokenBuildDisplayTime(timeMillis = state.timeMillis) {
+  return buildSnapshotTimeAt(timeMillis);
+}
+
+function unitStateForTokenDisplay(token, timeMillis = state.timeMillis) {
+  return unitStateForToken(token, tokenBuildDisplayTime(timeMillis));
+}
+
+function updateUnitTokenForTime(token, timeMillis = state.timeMillis) {
   if (token.isKing || !token.element) return;
-  const current = unitStateForToken(token);
+  const current = unitStateForTokenDisplay(token, timeMillis);
   if (!current || token.currentStateActionId === current.actionId) return;
 
   token.currentStateActionId = current.actionId;
@@ -5074,24 +5171,7 @@ function makeTokenData() {
     const placement = buildTokenPlacement(event);
     const player = playerForId(event.playerId);
     const builtAt = formatReplayTime(event.timeMillis);
-    const unitStates = event.stateChanges?.length
-      ? event.stateChanges
-      : [
-          {
-            actionId: event.actionId,
-            timeMillis: event.timeMillis,
-            level: 1,
-            unitType: event.unitType,
-            unitName: event.unitName || event.unitType,
-            goldCost: event.goldCost,
-            totalGoldCost: event.totalGoldCost,
-            sellGold: event.sellGold,
-            upgradeGroup: event.upgradeGroup,
-            iconPath: event.iconPath,
-            description: event.description,
-            stats: event.stats,
-          },
-        ];
+    const unitStates = buildStateChangesForEvent(event);
     const initialState = unitStates[0];
     const initialUnitName = initialState.unitName || initialState.unitType;
     const initialGoldCost = formatGoldCost(initialState.goldCost);
@@ -5196,7 +5276,7 @@ function selectionMetaForToken(token, details) {
 
   const currentLevel = Number(token.currentUpgradeLevel ?? details?.currentUpgradeLevel ?? 1);
   const currentTime = Number(token.currentStateTimeMillis ?? details?.currentStateTimeMillis ?? token.builtAtMillis ?? 0);
-  const currentState = unitStateForToken(token);
+  const currentState = unitStateForTokenDisplay(token);
   const currentGoldCost = formatGoldCost(currentState?.goldCost);
 
   if (currentLevel > 1) {
@@ -5231,7 +5311,7 @@ function selectionUpgradeTrailForToken(token) {
   if (currentLevel < 2 || unitStates.length < 2) return "";
 
   const visibleStates = unitStates
-    .filter((unitState) => Number(unitState.timeMillis ?? 0) <= state.timeMillis)
+    .filter((unitState) => Number(unitState.timeMillis ?? 0) <= tokenBuildDisplayTime())
     .sort((a, b) => Number(a.timeMillis ?? 0) - Number(b.timeMillis ?? 0) || Number(a.level ?? 0) - Number(b.level ?? 0));
 
   if (visibleStates.length < 2) return "";
@@ -5378,11 +5458,12 @@ async function createTokens() {
   positionTokens();
 }
 
-function isTokenActiveAtTime(token) {
+function isTokenActiveAtTime(token, timeMillis = state.timeMillis) {
+  const activeTimeMillis = token.isKing ? timeMillis : tokenBuildDisplayTime(timeMillis);
   return (
     token.isKing ||
-    ((token.builtAtMillis ?? 0) <= state.timeMillis &&
-      (token.removedAtMillis === null || token.removedAtMillis === undefined || state.timeMillis < Number(token.removedAtMillis)))
+    ((token.builtAtMillis ?? 0) <= activeTimeMillis &&
+      (token.removedAtMillis === null || token.removedAtMillis === undefined || activeTimeMillis < Number(token.removedAtMillis)))
   );
 }
 

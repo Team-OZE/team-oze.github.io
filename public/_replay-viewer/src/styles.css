@@ -91,21 +91,28 @@ input {
   accent-color: var(--gold);
 }
 
+.replay-controls input[type="range"] {
+  position: relative;
+  z-index: 1;
+  height: 22px;
+  margin: 0;
+}
+
 .replay-timeline {
   display: grid;
-  grid-template-rows: 13px 16px;
+  grid-template-rows: 18px 22px;
   align-items: center;
-  gap: 1px;
+  gap: 0;
   min-width: 0;
 }
 
 .level-anchors {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+  display: block;
   min-width: 0;
-  height: 13px;
-  overflow: hidden;
+  height: 18px;
+  overflow: visible;
   color: rgba(242, 237, 196, 0.58);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 9px;
@@ -119,11 +126,15 @@ input {
 }
 
 .level-anchors button {
-  display: inline-grid;
+  position: absolute;
+  top: 50%;
+  left: var(--level-anchor-position, 0%);
+  display: grid;
   place-items: center;
-  min-width: 11px;
-  height: 13px;
-  padding: 0 1px;
+  min-width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  padding: 0 2px;
   border: 0;
   background: transparent;
   color: #d9d3a6;
@@ -145,10 +156,14 @@ input {
 }
 
 .level-anchors__separator {
-  flex: 0 1 auto;
-  min-width: 2px;
+  position: absolute;
+  top: 50%;
+  left: var(--level-anchor-position, 0%);
+  width: 8px;
+  transform: translate(-50%, -50%);
   color: rgba(242, 237, 196, 0.32);
   pointer-events: none;
+  text-align: center;
 }
 
 .replay-play {
