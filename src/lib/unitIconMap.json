@@ -1,0 +1,962 @@
+[
+  {
+    "builder": "h00M",
+    "fighter": "h00L",
+    "icon": "replaceabletextures/commandbuttons/btnfootman"
+  },
+  {
+    "builder": "h00T",
+    "fighter": "h028",
+    "icon": "replaceabletextures/commandbuttons/btnthecaptain"
+  },
+  {
+    "builder": "h00O",
+    "fighter": "h02B",
+    "icon": "replaceabletextures/commandbuttons/btnrifleman"
+  },
+  {
+    "builder": "h00Y",
+    "fighter": "h02C",
+    "icon": "replaceabletextures/commandbuttons/btnchaosspaceorc"
+  },
+  {
+    "builder": "h11Y",
+    "fighter": "h22C",
+    "icon": "replaceabletextures/commandbuttons/btnchaosspaceorc"
+  },
+  {
+    "builder": "h00X",
+    "fighter": "h02D",
+    "icon": "replaceabletextures/commandbuttons/btnmarine"
+  },
+  {
+    "builder": "h00P",
+    "fighter": "h029",
+    "icon": "replaceabletextures/commandbuttons/btnspellbreaker"
+  },
+  {
+    "builder": "h00Z",
+    "fighter": "h02A",
+    "icon": "replaceabletextures/commandbuttons/btnproudmoore"
+  },
+  {
+    "builder": "h00N",
+    "fighter": "h02G",
+    "icon": "replaceabletextures/commandbuttons/btngoblinzeppelin"
+  },
+  {
+    "builder": "h00U",
+    "fighter": "h02H",
+    "icon": "replaceabletextures/commandbuttons/btnundeadairbarge"
+  },
+  {
+    "builder": "h00Q",
+    "fighter": "h02I",
+    "icon": "replaceabletextures/commandbuttons/btnarmorgolem"
+  },
+  {
+    "builder": "h00W",
+    "fighter": "h02J",
+    "icon": "replaceabletextures/commandbuttons/btnrobots"
+  },
+  {
+    "builder": "h00S",
+    "fighter": "h02E",
+    "icon": "replaceabletextures/commandbuttons/btnsteamtank"
+  },
+  {
+    "builder": "h2DD",
+    "fighter": "h1DD",
+    "icon": "replaceabletextures/commandbuttons/btnseigeenginewithmissles"
+  },
+  {
+    "builder": "h010",
+    "fighter": "h02L",
+    "icon": "replaceabletextures/commandbuttons/btngnoll"
+  },
+  {
+    "builder": "h011",
+    "fighter": "h02M",
+    "icon": "replaceabletextures/commandbuttons/btngnollarcher"
+  },
+  {
+    "builder": "h012",
+    "fighter": "h02N",
+    "icon": "replaceabletextures/commandbuttons/btnogre"
+  },
+  {
+    "builder": "h013",
+    "fighter": "h02O",
+    "icon": "replaceabletextures/commandbuttons/btnogrelord"
+  },
+  {
+    "builder": "h014",
+    "fighter": "h02P",
+    "icon": "replaceabletextures/commandbuttons/btnharpy"
+  },
+  {
+    "builder": "h015",
+    "fighter": "h02Q",
+    "icon": "replaceabletextures/commandbuttons/btnharpywitch"
+  },
+  {
+    "builder": "h016",
+    "fighter": "h02R",
+    "icon": "replaceabletextures/commandbuttons/btnforesttroll"
+  },
+  {
+    "builder": "h017",
+    "fighter": "h02S",
+    "icon": "replaceabletextures/commandbuttons/btnforesttrolltrapper"
+  },
+  {
+    "builder": "h018",
+    "fighter": "h02T",
+    "icon": "replaceabletextures/commandbuttons/btngrizzlybear"
+  },
+  {
+    "builder": "h019",
+    "fighter": "h02U",
+    "icon": "replaceabletextures/commandbuttons/btnbearform"
+  },
+  {
+    "builder": "h01A",
+    "fighter": "h02V",
+    "icon": "replaceabletextures/commandbuttons/btnbluedragonspawn"
+  },
+  {
+    "builder": "h01B",
+    "fighter": "h02W",
+    "icon": "replaceabletextures/commandbuttons/btnreddragon"
+  },
+  {
+    "builder": "h01C",
+    "fighter": "h02X",
+    "icon": "replaceabletextures/commandbuttons/btnent"
+  },
+  {
+    "builder": "h01D",
+    "fighter": "h02Y",
+    "icon": "replaceabletextures/commandbuttons/btntreant"
+  },
+  {
+    "builder": "h01E",
+    "fighter": "h02Z",
+    "icon": "replaceabletextures/commandbuttons/btnarcher"
+  },
+  {
+    "builder": "h01F",
+    "fighter": "h030",
+    "icon": "replaceabletextures/commandbuttons/btndryad"
+  },
+  {
+    "builder": "h01H",
+    "fighter": "h031",
+    "icon": "replaceabletextures/commandbuttons/btnfaeriedragon"
+  },
+  {
+    "builder": "h01G",
+    "fighter": "h032",
+    "icon": "replaceabletextures/commandbuttons/btnchimaera"
+  },
+  {
+    "builder": "h01I",
+    "fighter": "h033",
+    "icon": "replaceabletextures/commandbuttons/btnancientoflore"
+  },
+  {
+    "builder": "h01J",
+    "fighter": "h034",
+    "icon": "replaceabletextures/commandbuttons/btnancientofwonders"
+  },
+  {
+    "builder": "h01K",
+    "fighter": "h035",
+    "icon": "replaceabletextures/commandbuttons/btndruidoftheclaw"
+  },
+  {
+    "builder": "h01L",
+    "fighter": "h036",
+    "icon": "replaceabletextures/commandbuttons/btnmountaingiant"
+  },
+  {
+    "builder": "h01M",
+    "fighter": "h037",
+    "icon": "replaceabletextures/commandbuttons/btntreeoflife"
+  },
+  {
+    "builder": "h22O",
+    "fighter": "h999",
+    "icon": "replaceabletextures/commandbuttons/btntreeofeternity"
+  },
+  {
+    "builder": "h01N",
+    "fighter": "h038",
+    "icon": "replaceabletextures/commandbuttons/btntreeofages"
+  },
+  {
+    "builder": "h01O",
+    "fighter": "h039",
+    "icon": "replaceabletextures/commandbuttons/btncorruptedancientprotector"
+  },
+  {
+    "builder": "h01P",
+    "fighter": "h03A",
+    "icon": "replaceabletextures/commandbuttons/btnskeletonwarrior"
+  },
+  {
+    "builder": "h01Q",
+    "fighter": "h03B",
+    "icon": "replaceabletextures/commandbuttons/btnskeletalorc"
+  },
+  {
+    "builder": "h01R",
+    "fighter": "h03C",
+    "icon": "replaceabletextures/commandbuttons/btnskeletonarcher"
+  },
+  {
+    "builder": "h01S",
+    "fighter": "h03D",
+    "icon": "replaceabletextures/commandbuttons/btnskeletonmage"
+  },
+  {
+    "builder": "h01T",
+    "fighter": "h03E",
+    "icon": "replaceabletextures/commandbuttons/btncryptfiend"
+  },
+  {
+    "builder": "h01U",
+    "fighter": "h03F",
+    "icon": "replaceabletextures/commandbuttons/btnnerubianqueen"
+  },
+  {
+    "builder": "h01V",
+    "fighter": "h03G",
+    "icon": "replaceabletextures/commandbuttons/btnfelguard"
+  },
+  {
+    "builder": "h01W",
+    "fighter": "h03H",
+    "icon": "replaceabletextures/commandbuttons/btnfelguardblue"
+  },
+  {
+    "builder": "h01X",
+    "fighter": "h03I",
+    "icon": "replaceabletextures/commandbuttons/btnobsidianstatue"
+  },
+  {
+    "builder": "h01Y",
+    "fighter": "h03J",
+    "icon": "replaceabletextures/commandbuttons/btndestroyer"
+  },
+  {
+    "builder": "h01Z",
+    "fighter": "h03K",
+    "icon": "replaceabletextures/commandbuttons/btnfacelessone"
+  },
+  {
+    "builder": "h020",
+    "fighter": "h03L",
+    "icon": "replaceabletextures/commandbuttons/btndoppelganger"
+  },
+  {
+    "builder": "h021",
+    "fighter": "h03M",
+    "icon": "replaceabletextures/commandbuttons/btneredarwarlockpurple"
+  },
+  {
+    "builder": "h022",
+    "fighter": "h03N",
+    "icon": "replaceabletextures/commandbuttons/btndoomguard"
+  },
+  {
+    "builder": "h040",
+    "fighter": "h04C",
+    "icon": "replaceabletextures/commandbuttons/btnwispsplode"
+  },
+  {
+    "builder": "h041",
+    "fighter": "h04D",
+    "icon": "replaceabletextures/commandbuttons/btnavengingwatcher"
+  },
+  {
+    "builder": "h042",
+    "fighter": "h04E",
+    "icon": "replaceabletextures/commandbuttons/btnsummonwaterelemental"
+  },
+  {
+    "builder": "h043",
+    "fighter": "h04F",
+    "icon": "replaceabletextures/commandbuttons/btnseaelemental"
+  },
+  {
+    "builder": "h044",
+    "fighter": "h04G",
+    "icon": "replaceabletextures/commandbuttons/btnscout"
+  },
+  {
+    "builder": "h045",
+    "fighter": "h04H",
+    "icon": "replaceabletextures/commandbuttons/btnravenform"
+  },
+  {
+    "builder": "h046",
+    "fighter": "h04I",
+    "icon": "replaceabletextures/commandbuttons/btnrockgolem"
+  },
+  {
+    "builder": "h047",
+    "fighter": "h04J",
+    "icon": "replaceabletextures/commandbuttons/btnfleshgolem"
+  },
+  {
+    "builder": "h048",
+    "fighter": "h04K",
+    "icon": "replaceabletextures/commandbuttons/btnbanditmage"
+  },
+  {
+    "builder": "h049",
+    "fighter": "h04L",
+    "icon": "replaceabletextures/commandbuttons/btnghostmage"
+  },
+  {
+    "builder": "h04A",
+    "fighter": "h04M",
+    "icon": "replaceabletextures/commandbuttons/btnnetherdragon"
+  },
+  {
+    "builder": "h04B",
+    "fighter": "h04N",
+    "icon": "replaceabletextures/commandbuttons/btnmarkoffire"
+  },
+  {
+    "builder": "h05N",
+    "fighter": "h061",
+    "icon": "replaceabletextures/commandbuttons/btnbanshee"
+  },
+  {
+    "builder": "h05O",
+    "fighter": "h063",
+    "icon": "replaceabletextures/commandbuttons/btnghost"
+  },
+  {
+    "builder": "h05P",
+    "fighter": "h064",
+    "icon": "replaceabletextures/commandbuttons/btnspiritofvengeance"
+  },
+  {
+    "builder": "h05S",
+    "fighter": "h065",
+    "icon": "replaceabletextures/commandbuttons/btnshade"
+  },
+  {
+    "builder": "h062",
+    "fighter": "h067",
+    "icon": "replaceabletextures/commandbuttons/btnbanditlord"
+  },
+  {
+    "builder": "h05Q",
+    "fighter": "h066",
+    "icon": "replaceabletextures/commandbuttons/btnbanditlord"
+  },
+  {
+    "builder": "h05T",
+    "fighter": "h068",
+    "icon": "replaceabletextures/commandbuttons/btnmedivh"
+  },
+  {
+    "builder": "h05R",
+    "fighter": "h069",
+    "icon": "replaceabletextures/commandbuttons/btnvoidwalker"
+  },
+  {
+    "builder": "h05U",
+    "fighter": "h06A",
+    "icon": "replaceabletextures/commandbuttons/btnhellraiser"
+  },
+  {
+    "builder": "h998",
+    "fighter": "h997",
+    "icon": "replaceabletextures/commandbuttons/btnhellraiser2"
+  },
+  {
+    "builder": "h05V",
+    "fighter": "h06B",
+    "icon": "replaceabletextures/commandbuttons/btndeeplordrevenant"
+  },
+  {
+    "builder": "h05W",
+    "fighter": "h06C",
+    "icon": "replaceabletextures/commandbuttons/btnforsakenone"
+  },
+  {
+    "builder": "h05X",
+    "fighter": "h06D",
+    "icon": "replaceabletextures/commandbuttons/btnspiritwyvern"
+  },
+  {
+    "builder": "h05Y",
+    "fighter": "h06E",
+    "icon": "replaceabletextures/commandbuttons/btngravekeeper"
+  },
+  {
+    "builder": "h05Z",
+    "fighter": "h06F",
+    "icon": "replaceabletextures/commandbuttons/btnpriest"
+  },
+  {
+    "builder": "h060",
+    "fighter": "h06G",
+    "icon": "replaceabletextures/commandbuttons/btnspiritwalker"
+  },
+  {
+    "builder": "h06J",
+    "fighter": "h06U",
+    "icon": "replaceabletextures/commandbuttons/btngoblinsapper"
+  },
+  {
+    "builder": "h078",
+    "fighter": "h079",
+    "icon": "replaceabletextures/commandbuttons/btnmortarteam"
+  },
+  {
+    "builder": "h06I",
+    "fighter": "h06W",
+    "icon": "replaceabletextures/commandbuttons/btnheroalchemist"
+  },
+  {
+    "builder": "h076",
+    "fighter": "h077",
+    "icon": "replaceabletextures/commandbuttons/btnheroalchemist"
+  },
+  {
+    "builder": "h06K",
+    "fighter": "h06X",
+    "icon": "replaceabletextures/commandbuttons/btnpeon"
+  },
+  {
+    "builder": "h06L",
+    "fighter": "h06Y",
+    "icon": "replaceabletextures/commandbuttons/btnherofarseer"
+  },
+  {
+    "builder": "h06M",
+    "fighter": "h06V",
+    "icon": "replaceabletextures/commandbuttons/btnheadhunter"
+  },
+  {
+    "builder": "h06N",
+    "fighter": "h06Z",
+    "icon": "replaceabletextures/commandbuttons/btnheadhunterberserker"
+  },
+  {
+    "builder": "h06O",
+    "fighter": "h070",
+    "icon": "replaceabletextures/commandbuttons/btnwitchdoctor"
+  },
+  {
+    "builder": "h06P",
+    "fighter": "h071",
+    "icon": "replaceabletextures/commandbuttons/btnshaman"
+  },
+  {
+    "builder": "h06Q",
+    "fighter": "h072",
+    "icon": "replaceabletextures/commandbuttons/btndemoness"
+  },
+  {
+    "builder": "h06R",
+    "fighter": "h073",
+    "icon": "replaceabletextures/commandbuttons/btnbluedemoness"
+  },
+  {
+    "builder": "h06S",
+    "fighter": "h074",
+    "icon": "replaceabletextures/commandbuttons/btntauren"
+  },
+  {
+    "builder": "h06T",
+    "fighter": "h075",
+    "icon": "replaceabletextures/commandbuttons/btnsasquatch"
+  },
+  {
+    "builder": "h07J",
+    "fighter": "h07K",
+    "icon": "replaceabletextures/commandbuttons/btnmurgalslave"
+  },
+  {
+    "builder": "h07L",
+    "fighter": "h07Z",
+    "icon": "replaceabletextures/commandbuttons/btnmurlocmutant"
+  },
+  {
+    "builder": "h07M",
+    "fighter": "h080",
+    "icon": "replaceabletextures/commandbuttons/btnmurgulbloodgill"
+  },
+  {
+    "builder": "h07N",
+    "fighter": "h081",
+    "icon": "replaceabletextures/commandbuttons/btnmurlocflesheater"
+  },
+  {
+    "builder": "h07O",
+    "fighter": "h082",
+    "icon": "replaceabletextures/commandbuttons/btnphoenixegg"
+  },
+  {
+    "builder": "h07P",
+    "fighter": "h083",
+    "icon": "replaceabletextures/commandbuttons/btnwindserpent"
+  },
+  {
+    "builder": "h07Q",
+    "fighter": "h084",
+    "icon": "replaceabletextures/commandbuttons/btnlobstrokkred"
+  },
+  {
+    "builder": "h07R",
+    "fighter": "h085",
+    "icon": "replaceabletextures/commandbuttons/btnlobstrokkblue"
+  },
+  {
+    "builder": "h07S",
+    "fighter": "h086",
+    "icon": "replaceabletextures/commandbuttons/btnseawitch"
+  },
+  {
+    "builder": "h07T",
+    "fighter": "h087",
+    "icon": "replaceabletextures/commandbuttons/btnnagasummoner"
+  },
+  {
+    "builder": "h07U",
+    "fighter": "h08B",
+    "icon": "replaceabletextures/commandbuttons/btnsnapdragon"
+  },
+  {
+    "builder": "h07V",
+    "fighter": "h088",
+    "icon": "replaceabletextures/commandbuttons/btnnagamyrmidon"
+  },
+  {
+    "builder": "h07W",
+    "fighter": "h089",
+    "icon": "replaceabletextures/commandbuttons/btnseagiantgreen"
+  },
+  {
+    "builder": "h07X",
+    "fighter": "h08A",
+    "icon": "replaceabletextures/commandbuttons/btngreenhydra"
+  },
+  {
+    "builder": "h08F",
+    "fighter": "h08E",
+    "icon": "replaceabletextures/commandbuttons/btnhippogriff"
+  },
+  {
+    "builder": "h08I",
+    "fighter": "h08J",
+    "icon": "replaceabletextures/commandbuttons/btnhippogriffrider"
+  },
+  {
+    "builder": "h08H",
+    "fighter": "h08G",
+    "icon": "replaceabletextures/commandbuttons/btnbloodelfpeasant"
+  },
+  {
+    "builder": "h08L",
+    "fighter": "h08K",
+    "icon": "replaceabletextures/commandbuttons/btnstromgardefootman"
+  },
+  {
+    "builder": "h08N",
+    "fighter": "h08M",
+    "icon": "replaceabletextures/commandbuttons/btnhuntress"
+  },
+  {
+    "builder": "h08P",
+    "fighter": "h08O",
+    "icon": "replaceabletextures/commandbuttons/btnhuntress"
+  },
+  {
+    "builder": "h08Q",
+    "fighter": "h08R",
+    "icon": "replaceabletextures/commandbuttons/btncagedillidan"
+  },
+  {
+    "builder": "h08S",
+    "fighter": "h08T",
+    "icon": "replaceabletextures/commandbuttons/btndragonhawk"
+  },
+  {
+    "builder": "h08V",
+    "fighter": "h092",
+    "icon": "replaceabletextures/commandbuttons/btndruidofthetalon"
+  },
+  {
+    "builder": "h08Y",
+    "fighter": "h08X",
+    "icon": "replaceabletextures/commandbuttons/btnsorceress"
+  },
+  {
+    "builder": "h08Z",
+    "fighter": "h08W",
+    "icon": "replaceabletextures/commandbuttons/btnspellbreaker"
+  },
+  {
+    "builder": "h090",
+    "fighter": "h091",
+    "icon": "replaceabletextures/commandbuttons/btnassassin"
+  },
+  {
+    "builder": "h093",
+    "fighter": "h094",
+    "icon": "replaceabletextures/commandbuttons/btnherowarden"
+  },
+  {
+    "builder": "h09L",
+    "fighter": "h09F",
+    "icon": "replaceabletextures/commandbuttons/btnpeasant"
+  },
+  {
+    "builder": "h09H",
+    "fighter": "h09K",
+    "icon": "replaceabletextures/commandbuttons/btnmilitia"
+  },
+  {
+    "builder": "h09W",
+    "fighter": "h09Y",
+    "icon": "replaceabletextures/commandbuttons/btnhighelvenarcher"
+  },
+  {
+    "builder": "h09M",
+    "fighter": "h09G",
+    "icon": "replaceabletextures/commandbuttons/btnsylvanuswindrunner"
+  },
+  {
+    "builder": "h09N",
+    "fighter": "h09V",
+    "icon": "replaceabletextures/commandbuttons/btnfootman"
+  },
+  {
+    "builder": "h09O",
+    "fighter": "h09P",
+    "icon": "replaceabletextures/commandbuttons/btnthecaptain"
+  },
+  {
+    "builder": "h09R",
+    "fighter": "h09Q",
+    "icon": "replaceabletextures/commandbuttons/btnpriest"
+  },
+  {
+    "builder": "h09S",
+    "fighter": "h09Z",
+    "icon": "replaceabletextures/commandbuttons/btnbanditmage"
+  },
+  {
+    "builder": "h09T",
+    "fighter": "h09D",
+    "icon": "replaceabletextures/commandbuttons/btnknight"
+  },
+  {
+    "builder": "h09U",
+    "fighter": "h09X",
+    "icon": "replaceabletextures/commandbuttons/btnbanditlord"
+  },
+  {
+    "builder": "h0A3",
+    "fighter": "h0A2",
+    "icon": "replaceabletextures/commandbuttons/btndragonhawk"
+  },
+  {
+    "builder": "h0A0",
+    "fighter": "h09I",
+    "icon": "replaceabletextures/commandbuttons/btngryphonrider"
+  },
+  {
+    "builder": "h0AE",
+    "fighter": "h0AD",
+    "icon": "replaceabletextures/commandbuttons/btnkoboldgeomancer"
+  },
+  {
+    "builder": "h0AF",
+    "fighter": "h0AG",
+    "icon": "replaceabletextures/commandbuttons/btnclockwerkgoblin"
+  },
+  {
+    "builder": "h0AB",
+    "fighter": "h0AC",
+    "icon": "replaceabletextures/commandbuttons/btnturret1"
+  },
+  {
+    "builder": "h0AA",
+    "fighter": "h0A9",
+    "icon": "replaceabletextures/commandbuttons/btngoblindrillbot"
+  },
+  {
+    "builder": "h0AH",
+    "fighter": "h0AI",
+    "icon": "replaceabletextures/commandbuttons/btnflyingmachine"
+  },
+  {
+    "builder": "h0AJ",
+    "fighter": "h0AK",
+    "icon": "replaceabletextures/commandbuttons/btndwarfcar"
+  },
+  {
+    "builder": "h0AL",
+    "fighter": "h0AM",
+    "icon": "replaceabletextures/commandbuttons/btngreedisgood2"
+  },
+  {
+    "builder": "h0AO",
+    "fighter": "h0AN",
+    "icon": "replaceabletextures/commandbuttons/btnjunkgolem"
+  },
+  {
+    "builder": "h0AR",
+    "fighter": "h0AS",
+    "icon": "replaceabletextures/commandbuttons/btngoblinsteamroller"
+  },
+  {
+    "builder": "h0AQ",
+    "fighter": "h0AP",
+    "icon": "replaceabletextures/commandbuttons/btngoblinassaulttank"
+  },
+  {
+    "builder": "h0BC",
+    "fighter": "n00B",
+    "icon": "replaceabletextures/commandbuttons/btntuskaarbrown"
+  },
+  {
+    "builder": "h0BD",
+    "fighter": "n00C",
+    "icon": "replaceabletextures/commandbuttons/btntuskaargold"
+  },
+  {
+    "builder": "h0BE",
+    "fighter": "n00D",
+    "icon": "replaceabletextures/commandbuttons/btntimberwolf"
+  },
+  {
+    "builder": "h0BG",
+    "fighter": "n00K",
+    "icon": "replaceabletextures/commandbuttons/btnfurbolgpanda"
+  },
+  {
+    "builder": "h0BH",
+    "fighter": "o001",
+    "icon": "replaceabletextures/commandbuttons/btnicetrollshadowpriest"
+  },
+  {
+    "builder": "h0BI",
+    "fighter": "n00E",
+    "icon": "replaceabletextures/commandbuttons/btnwitchdoctor"
+  },
+  {
+    "builder": "h0BJ",
+    "fighter": "n00F",
+    "icon": "replaceabletextures/commandbuttons/btnfrostbear"
+  },
+  {
+    "builder": "h0BK",
+    "fighter": "n00G",
+    "icon": "replaceabletextures/commandbuttons/btnbluemagnataur"
+  },
+  {
+    "builder": "h0BM",
+    "fighter": "n00I",
+    "icon": "replaceabletextures/commandbuttons/btnwendigo"
+  },
+  {
+    "builder": "h0BL",
+    "fighter": "n00H",
+    "icon": "replaceabletextures/commandbuttons/btnwendigo"
+  },
+  {
+    "builder": "h0BO",
+    "fighter": "h0BN",
+    "icon": "replaceabletextures/commandbuttons/btnbluedragonroost"
+  },
+  {
+    "builder": "h0BP",
+    "fighter": "n00J",
+    "icon": "replaceabletextures/commandbuttons/btnazuredragon"
+  },
+  {
+    "builder": "h0BF",
+    "fighter": "h0AY",
+    "icon": "replaceabletextures/commandbuttons/btngrunt"
+  },
+  {
+    "builder": "h0BS",
+    "fighter": "h0BT",
+    "icon": "replaceabletextures/commandbuttons/btnchaospeon"
+  },
+  {
+    "builder": "h0BU",
+    "fighter": "h0CD",
+    "icon": "replaceabletextures/commandbuttons/btnchaosgrunt"
+  },
+  {
+    "builder": "h0BV",
+    "fighter": "o002",
+    "icon": "replaceabletextures/commandbuttons/btnchaoswarlockgreen"
+  },
+  {
+    "builder": "h0BW",
+    "fighter": "n00P",
+    "icon": "replaceabletextures/commandbuttons/btnchaoswarlock"
+  },
+  {
+    "builder": "h0BX",
+    "fighter": "h0BY",
+    "icon": "replaceabletextures/commandbuttons/btnraider"
+  },
+  {
+    "builder": "h0C0",
+    "fighter": "h0BZ",
+    "icon": "replaceabletextures/commandbuttons/btnchaoswolfrider"
+  },
+  {
+    "builder": "h0C4",
+    "fighter": "h0C3",
+    "icon": "replaceabletextures/commandbuttons/btnorcwarlockred"
+  },
+  {
+    "builder": "h0C2",
+    "fighter": "h0C1",
+    "icon": "replaceabletextures/commandbuttons/btnguldan"
+  },
+  {
+    "builder": "h0C5",
+    "fighter": "h0C6",
+    "icon": "replaceabletextures/commandbuttons/btnwyvern"
+  },
+  {
+    "builder": "h0C8",
+    "fighter": "h0C7",
+    "icon": "replaceabletextures/commandbuttons/btnwyvernrider"
+  },
+  {
+    "builder": "h0C9",
+    "fighter": "h0CA",
+    "icon": "replaceabletextures/commandbuttons/btnchaoswarlord"
+  },
+  {
+    "builder": "h0CC",
+    "fighter": "h0CB",
+    "icon": "replaceabletextures/commandbuttons/btnthrall"
+  },
+  {
+    "builder": "h0CF",
+    "fighter": "h0CE",
+    "icon": "replaceabletextures/commandbuttons/btnacolyte"
+  },
+  {
+    "builder": "h0CH",
+    "fighter": "h0CG",
+    "icon": "replaceabletextures/commandbuttons/btnrevenant"
+  },
+  {
+    "builder": "h0CI",
+    "fighter": "h0CJ",
+    "icon": "replaceabletextures/commandbuttons/btnghoul"
+  },
+  {
+    "builder": "h0CK",
+    "fighter": "h0CL",
+    "icon": "replaceabletextures/commandbuttons/btnreddragondevour"
+  },
+  {
+    "builder": "h0CO",
+    "fighter": "h0CM",
+    "icon": "replaceabletextures/commandbuttons/btnmeatwagon"
+  },
+  {
+    "builder": "h0CP",
+    "fighter": "h0CN",
+    "icon": "replaceabletextures/commandbuttons/btninfernalcannon"
+  },
+  {
+    "builder": "h0CQ",
+    "fighter": "h0CR",
+    "icon": "replaceabletextures/commandbuttons/btnnecromancer"
+  },
+  {
+    "builder": "h0CS",
+    "fighter": "h0CT",
+    "icon": "replaceabletextures/commandbuttons/btnkelthuzad"
+  },
+  {
+    "builder": "h0CV",
+    "fighter": "h0CU",
+    "icon": "replaceabletextures/commandbuttons/btnghostofkelthuzad"
+  },
+  {
+    "builder": "h0CW",
+    "fighter": "h0CX",
+    "icon": "replaceabletextures/commandbuttons/btnzombie"
+  },
+  {
+    "builder": "h0CY",
+    "fighter": "h0CZ",
+    "icon": "replaceabletextures/commandbuttons/btnabomination"
+  },
+  {
+    "builder": "h0D0",
+    "fighter": "h0D1",
+    "icon": "replaceabletextures/commandbuttons/btnpitlord"
+  },
+  {
+    "builder": "h0D2",
+    "fighter": "h0D3",
+    "icon": "replaceabletextures/commandbuttons/btnfrostwyrm"
+  },
+  {
+    "builder": "h00R",
+    "fighter": "h0SN",
+    "icon": "war3mapimported/btnshadowdisguise"
+  },
+  {
+    "builder": "h026",
+    "fighter": "h02K",
+    "icon": "replaceabletextures/commandbuttons/btnbandit"
+  },
+  {
+    "builder": "h0DH",
+    "fighter": "h0GG",
+    "icon": "war3mapimported/btnairrevenant"
+  },
+  {
+    "builder": "h01q",
+    "fighter": "h03b",
+    "icon": "war3mapimported/btnskeletoncs"
+  },
+  {
+    "builder": "h07B",
+    "fighter": "h07C",
+    "icon": "replaceabletextures/commandbuttons/btnskeletonarcher"
+  },
+  {
+    "builder": "h158",
+    "fighter": "h058",
+    "icon": "war3mapimported/btncaptainherdon"
+  },
+  {
+    "builder": "h28J",
+    "fighter": "h18J",
+    "icon": "war3mapimported/btnspellbreakermounted"
+  },
+  {
+    "builder": "h12N",
+    "fighter": "h12M",
+    "icon": "war3mapimported/btngnolltreasurehunter.blp"
+  },
+  {
+    "builder": "h14E",
+    "fighter": "h14D",
+    "icon": "replaceabletextures/commandbuttons/btnspiritofvengeance"
+  }
+]

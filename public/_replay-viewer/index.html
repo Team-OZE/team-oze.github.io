@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Legion TD Tactical Map</title>
+    <script>
+      (() => {
+        let isTopLevel = false;
+
+        try {
+          isTopLevel = window.self === window.top;
+        } catch {
+          isTopLevel = false;
+        }
+
+        if (!isTopLevel) {
+          return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const replayGameId = params.get("replayGameId") || params.get("gameId") || params.get("matchId") || params.get("id");
+        const target = new URL("/", window.location.origin);
+
+        if (replayGameId) {
+          target.searchParams.set("replayGameId", replayGameId);
+          target.searchParams.set("s", params.get("s") || "0");
+        }
+
+        window.location.replace(target);
+      })();
+    </script>
+    <link rel="stylesheet" href="src/styles.css?v=227" />
+  </head>
+  <body>
+    <main class="app">
+      <div class="replay-controls" aria-label="Replay timeline">
+        <output id="replay-current-time" for="replay-time">00:00</output>
+        <button id="replay-play" class="replay-play" type="button" aria-label="Play replay" data-playing="false"></button>
+        <div class="replay-speed" aria-label="Replay speed">
+          <button id="replay-speed-down" type="button" aria-label="Slow replay down">-</button>
+          <output id="replay-speed-value">1x</output>
+          <button id="replay-speed-up" type="button" aria-label="Speed replay up">+</button>
+        </div>
+        <div class="replay-timeline">
+          <div id="level-anchors" class="level-anchors" aria-label="Level build anchors" hidden></div>
+          <input id="replay-time" type="range" min="0" max="0" value="0" step="1000" aria-label="Replay time" />
+        </div>
+        <output id="replay-duration" for="replay-time">00:00</output>
+        <div id="load-state-controls" class="load-state-controls" aria-label="Warcraft load state" hidden>
+          <select id="load-state-player" aria-label="Player army"></select>
+          <button id="load-state-download" type="button" title="Download Benchmark.pld">Save</button>
+        </div>
+      </div>
+      <header class="topbar">
+        <div class="title-block">
+          <p class="eyebrow">Legion TD OZE</p>
+          <h1>Tactical Map</h1>
+          <p id="map-source" class="source"></p>
+        </div>
+        <div class="zoom-controls" aria-label="Map camera zoom">
+          <button id="zoom-out" type="button" aria-label="Zoom out">-</button>
+          <input id="map-zoom" type="range" min="45" max="100" value="100" step="5" aria-label="Camera zoom" />
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+          <output id="map-zoom-value" for="map-zoom">100%</output>
+        </div>
+      </header>
+      <div class="left-controls">
+        <div class="icon-controls" role="group" aria-label="Unit icon art">
+          <button type="button" data-icon-mode="classic" aria-pressed="true">Classic</button>
+          <button type="button" data-icon-mode="reforged" aria-pressed="false">Reforged</button>
+        </div>
+        <section id="wave-status" class="wave-status" aria-label="Wave status" hidden>
+          <div class="wave-status__phase" data-wave-phase>Loading</div>
+          <div class="wave-status__main">
+            <strong data-wave-title>Wave</strong>
+            <span data-wave-timer>--</span>
+          </div>
+          <div class="wave-status__detail" data-wave-detail></div>
+        </section>
+      </div>
+
+      <section id="map-board" class="map-board" aria-label="Legion TD terrain viewport">
+        <canvas id="map-canvas"></canvas>
+        <div id="unit-layer" class="unit-layer" aria-label="Placed unit icons"></div>
+        <div id="player-corner-overlay" class="player-corner-overlay" aria-label="Player corner panels"></div>
+        <div id="team-overlay" class="team-overlay" aria-label="Team placeholders" data-hidden="true">
+          <section class="team-overlay__side team-overlay__side--one" aria-label="Team 1">
+            <div class="team-overlay__title">&larr; TEAM 1</div>
+            <div class="team-overlay__player">player name1</div>
+            <div class="team-overlay__player">player name2</div>
+            <div class="team-overlay__player">player name3</div>
+            <div class="team-overlay__player">player name4</div>
+          </section>
+          <section class="team-overlay__side team-overlay__side--two" aria-label="Team 2">
+            <div class="team-overlay__title">&rarr; TEAM 2</div>
+            <div class="team-overlay__player">player name1</div>
+            <div class="team-overlay__player">player name2</div>
+            <div class="team-overlay__player">player name3</div>
+            <div class="team-overlay__player">player name4</div>
+          </section>
+        </div>
+        <aside id="player-events-popover" class="player-events-popover" aria-label="Player event history" hidden></aside>
+        <canvas id="map-minimap" class="map-minimap" aria-label="Map minimap"></canvas>
+        <aside id="selection-card" class="selection-card" hidden></aside>
+      </section>
+      <aside id="endgame-overlay" class="endgame-overlay" aria-label="Game result" hidden></aside>
+    </main>
+
+    <script type="module" src="src/app.js?v=267"></script>
+  </body>
+</html>

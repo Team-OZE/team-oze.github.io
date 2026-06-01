@@ -2,6 +2,7 @@
 .env*
 !.env.example
 .next/
+.playwright-mcp/
 node_modules/
 out/
 tsconfig.tsbuildinfo
