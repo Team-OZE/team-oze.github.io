@@ -329,6 +329,11 @@ function clearReplayKeyboardSeek(direction = 0) {
   replayKeyboardSeekDirection = 0;
 }
 
+function focusReplayTimeline() {
+  replayTime.focus({ preventScroll: true });
+  window.setTimeout(() => replayTime.focus({ preventScroll: true }), 0);
+}
+
 function emptyReplayIndex() {
   return {
     statsByPlayer: new Map(),
@@ -3683,6 +3688,7 @@ function seekReplayLevelOutcome(button) {
   pausePlayback();
   state.prepHighlightWaveLevel = level;
   seekReplayTime(timeMillis);
+  focusReplayTimeline();
 }
 
 function tickPlayback(now) {
@@ -6249,9 +6255,16 @@ replayPlay.addEventListener("click", () => {
   } else {
     pausePlayback();
   }
+  focusReplayTimeline();
 });
-replaySpeedDown.addEventListener("click", () => stepPlaybackRate(-1));
-replaySpeedUp.addEventListener("click", () => stepPlaybackRate(1));
+replaySpeedDown.addEventListener("click", () => {
+  stepPlaybackRate(-1);
+  focusReplayTimeline();
+});
+replaySpeedUp.addEventListener("click", () => {
+  stepPlaybackRate(1);
+  focusReplayTimeline();
+});
 loadStatePlayer?.addEventListener("change", () => {
   const playerId = currentLoadStatePlayerId();
   state.selectedLoadStatePlayerId = playerId;
