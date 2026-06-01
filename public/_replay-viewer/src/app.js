@@ -6163,8 +6163,7 @@ updateIconModeButtons();
 updateSource();
 await createTokens();
 draw();
+pausePlayback();
 if (replayIsAtEnd()) {
   updateEndgameOverlay();
-} else {
-  startPlayback();
 }
