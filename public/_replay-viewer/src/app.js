@@ -2971,13 +2971,8 @@ function prepWindowContainsMillis(prepWindow, timeMillis) {
   return millis >= prepWindow.startMillis && millis <= prepWindow.currentMillis && millis < prepWindow.endMillis;
 }
 
-function tokenIsInGreenBuildCell(token) {
-  if (token.isKing) return false;
-  return displayKindAt(token.centerCellX, token.centerCellY) === "green";
-}
-
 function tokenChangedInPrep(token, prepWindow, { builtOnly = false } = {}) {
-  if (!prepWindow || token.isKing || !tokenIsInGreenBuildCell(token) || !isTokenActiveAtTime(token)) return false;
+  if (!prepWindow || token.isKing || !isTokenActiveAtTime(token)) return false;
 
   const states = Array.isArray(token.unitStates) ? token.unitStates : [];
   return states.some((unitState, index) => {
@@ -4314,6 +4309,16 @@ function playerRollAtOrBefore(playerId, timeMillis = state.timeMillis) {
   return lastAtOrBefore(state.replayIndex.rollsByPlayer.get(Number(playerId)) || [], timeMillis);
 }
 
+function playerRollDisplayTimeAt(timeMillis = state.timeMillis) {
+  const reviewWave = reviewWaveAtTime(timeMillis);
+  if (reviewWave) return Math.max(0, Number(reviewWave.startMillis) - 1);
+
+  const status = waveStatusAtTime(timeMillis);
+  if (status.phase === "wave" && status.wave) return Math.max(0, Number(status.wave.startMillis) - 1);
+
+  return timeMillis;
+}
+
 function rollIconFallbackLabel(unit) {
   return initials(unit?.unitName || unit?.unitType || "?");
 }
@@ -4691,7 +4696,7 @@ function renderPlayerRoll(card, playerId) {
   const roll = card.querySelector("[data-player-roll]");
   if (!roll) return;
 
-  const playerRoll = playerRollAtOrBefore(playerId);
+  const playerRoll = playerRollAtOrBefore(playerId, playerRollDisplayTimeAt());
   const units = playerRoll?.units || [];
   if (!units.length) {
     roll.hidden = true;
