@@ -135,6 +135,8 @@ const REPLAY_LEVEL_SEPARATOR_WIDTH_PX = 0;
 const REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS = 75;
 const REPLAY_RANGE_THUMB_SIZE_PX = 18;
 const REPLAY_TIMELINE_RANGE_STEPS = 100000;
+const REPLAY_KEYBOARD_SEEK_STEP_MS = 5000;
+const REPLAY_KEYBOARD_SEEK_REPEAT_MS = 100;
 const PREP_EVENT_TYPES = new Set(["UNIT_BUILD", "UNIT_UPGRADE", "UNIT_SELL", "LUMBER_WISP", "LUMBER_UPGRADE"]);
 // The replay action stream only records trained wisps; every player starts with one.
 const BASE_WISP_COUNT = 1;
@@ -251,6 +253,8 @@ window.__legionMap = { mapData, state, draw };
 
 let lastPublishedReplayId;
 let lastPublishedSeekParam;
+let replayKeyboardSeekInterval;
+let replayKeyboardSeekDirection = 0;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -314,6 +318,15 @@ function publishReplayTime() {
       targetOrigin,
     );
   }
+}
+
+function clearReplayKeyboardSeek(direction = 0) {
+  if (direction && replayKeyboardSeekDirection !== direction) return;
+  if (replayKeyboardSeekInterval !== undefined) {
+    window.clearInterval(replayKeyboardSeekInterval);
+    replayKeyboardSeekInterval = undefined;
+  }
+  replayKeyboardSeekDirection = 0;
 }
 
 function emptyReplayIndex() {
@@ -3647,6 +3660,21 @@ function seekReplayTime(milliseconds) {
   }
 }
 
+function keyboardSeekReplayTime(direction) {
+  state.prepHighlightWaveLevel = undefined;
+  seekReplayTime(state.timeMillis + direction * REPLAY_KEYBOARD_SEEK_STEP_MS);
+}
+
+function startReplayKeyboardSeek(direction) {
+  clearReplayKeyboardSeek();
+  replayKeyboardSeekDirection = direction;
+  keyboardSeekReplayTime(direction);
+  replayKeyboardSeekInterval = window.setInterval(
+    () => keyboardSeekReplayTime(direction),
+    REPLAY_KEYBOARD_SEEK_REPEAT_MS,
+  );
+}
+
 function seekReplayLevelOutcome(button) {
   const level = Number(button.dataset.level);
   const timeMillis = Number(button.dataset.timeMillis);
@@ -6189,6 +6217,26 @@ for (const button of iconModeButtons) {
 replayTime.addEventListener("input", () => {
   state.prepHighlightWaveLevel = undefined;
   seekReplayTime(replayTimelineTimeForInputValue(Number(replayTime.value)));
+});
+replayTime.addEventListener("keydown", (event) => {
+  const direction = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+  if (!direction) return;
+
+  event.preventDefault();
+  if (event.repeat) return;
+  startReplayKeyboardSeek(direction);
+});
+replayTime.addEventListener("keyup", (event) => {
+  const direction = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+  if (!direction) return;
+
+  event.preventDefault();
+  clearReplayKeyboardSeek(direction);
+});
+replayTime.addEventListener("blur", () => clearReplayKeyboardSeek());
+window.addEventListener("blur", () => clearReplayKeyboardSeek());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") clearReplayKeyboardSeek();
 });
 levelAnchors?.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-time-millis]");
