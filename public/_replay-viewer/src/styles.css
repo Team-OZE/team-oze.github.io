@@ -594,6 +594,14 @@ h1 {
   cursor: grabbing;
 }
 
+.map-board:focus {
+  outline: none;
+}
+
+.map-board:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(213, 175, 71, 0.78);
+}
+
 #map-canvas {
   position: absolute;
   inset: 0;

@@ -137,6 +137,7 @@ const REPLAY_RANGE_THUMB_SIZE_PX = 18;
 const REPLAY_TIMELINE_RANGE_STEPS = 100000;
 const REPLAY_KEYBOARD_SEEK_STEP_MS = 5000;
 const REPLAY_KEYBOARD_SEEK_REPEAT_MS = 100;
+const MAP_KEYBOARD_PAN_RATIO = 0.1;
 const PREP_EVENT_TYPES = new Set(["UNIT_BUILD", "UNIT_UPGRADE", "UNIT_SELL", "LUMBER_WISP", "LUMBER_UPGRADE"]);
 // The replay action stream only records trained wisps; every player starts with one.
 const BASE_WISP_COUNT = 1;
@@ -1715,6 +1716,15 @@ function setFrame(next) {
   positionTeamOverlay();
   positionPlayerCornerPanels();
   draw();
+}
+
+function panFrameByRatio(dxRatio, dyRatio) {
+  const current = frame();
+  setFrame({
+    ...current,
+    x: current.x + current.width * dxRatio,
+    y: current.y + current.height * dyRatio,
+  });
 }
 
 function setZoom(nextZoom, anchor) {
@@ -6104,6 +6114,7 @@ function scrollPlayerEventsPopover(event) {
 
 board.addEventListener("pointerdown", (event) => {
   if (blocksMapDrag(event.target)) return;
+  board.focus({ preventScroll: true });
   board.setPointerCapture(event.pointerId);
   board.dataset.dragging = "true";
   state.drag = {
@@ -6148,6 +6159,22 @@ board.addEventListener(
   },
   { passive: false },
 );
+
+board.addEventListener("keydown", (event) => {
+  if (event.target !== board) return;
+
+  const directions = {
+    ArrowLeft: [-MAP_KEYBOARD_PAN_RATIO, 0],
+    ArrowRight: [MAP_KEYBOARD_PAN_RATIO, 0],
+    ArrowUp: [0, -MAP_KEYBOARD_PAN_RATIO],
+    ArrowDown: [0, MAP_KEYBOARD_PAN_RATIO],
+  };
+  const direction = directions[event.key];
+  if (!direction) return;
+
+  event.preventDefault();
+  panFrameByRatio(direction[0], direction[1]);
+});
 
 playerEventsPopover?.addEventListener("wheel", scrollPlayerEventsPopover, { passive: false });
 
