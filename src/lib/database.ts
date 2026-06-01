@@ -30,7 +30,7 @@ async function resolveDatabaseConfig(): Promise<PoolOptions | null> {
   const url = process.env.DATABASE_URL ?? process.env.MYSQL_URL ?? process.env.MARIADB_URL;
 
   if (url) {
-    return { uri: url };
+    return { uri: url, ...sslConfig() };
   }
 
   const explicit = explicitConfig();
@@ -62,8 +62,23 @@ function explicitConfig(): PoolOptions | null {
     host: host ?? "127.0.0.1",
     password,
     port: portValue ? Number(portValue) : 3306,
-    user: user ?? "root"
+    user: user ?? "root",
+    ...sslConfig()
   };
+}
+
+function sslConfig(): Partial<PoolOptions> {
+  const sslMode = process.env.DB_SSL ?? process.env.MYSQL_SSL ?? process.env.MARIADB_SSL;
+
+  if (sslMode === "0" || sslMode === "false") {
+    return {};
+  }
+
+  if (sslMode) {
+    return { ssl: {} };
+  }
+
+  return {};
 }
 
 async function discoverLocalConfig(): Promise<PoolOptions | null> {

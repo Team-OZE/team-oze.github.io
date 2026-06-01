@@ -2,13 +2,10 @@
   "name": "team-oze-legion-td",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": "22.x"
-  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node server.js",
+    "start": "next start",
     "test": "node scripts/test-replay-geometry.mjs",
     "typecheck": "tsc --noEmit"
   },
