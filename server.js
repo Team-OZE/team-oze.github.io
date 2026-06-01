@@ -12,6 +12,11 @@ function startW3cStatsInterval() {
     return;
   }
 
+  if (!hasExplicitDatabaseConfig()) {
+    console.log("Skipping internal W3C stats refresh: database env vars are not configured");
+    return;
+  }
+
   const intervalMs = Number(process.env.W3C_PLAYER_STATS_INTERNAL_CRON_MS || 300000);
 
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
@@ -44,6 +49,25 @@ function startW3cStatsInterval() {
 
   setTimeout(refresh, 30000).unref();
   setInterval(refresh, intervalMs).unref();
+}
+
+function hasExplicitDatabaseConfig() {
+  const databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.MARIADB_URL;
+
+  if (databaseUrl) {
+    return true;
+  }
+
+  return Boolean(
+    process.env.DB_NAME ||
+      process.env.MYSQL_DATABASE ||
+      process.env.MYSQL_DB ||
+      process.env.MARIADB_DATABASE ||
+      process.env.MARIADB_DB ||
+      process.env.DB_HOST ||
+      process.env.MYSQL_HOST ||
+      process.env.MARIADB_HOST
+  );
 }
 
 app.prepare().then(() => {
