@@ -31,6 +31,7 @@ const zoomIn = document.querySelector("#zoom-in");
 const zoomValue = document.querySelector("#map-zoom-value");
 const selectionCard = document.querySelector("#selection-card");
 const playerEventsPopover = document.querySelector("#player-events-popover");
+const playerProfilePopover = document.querySelector("#player-profile-popover");
 const endgameOverlay = document.querySelector("#endgame-overlay");
 const waveStatus = document.querySelector("#wave-status");
 const wavePhase = document.querySelector("[data-wave-phase]");
@@ -131,21 +132,25 @@ const REPLAY_CONTROLS_BASE_TARGET_WIDTH_PX = 590;
 const REPLAY_CONTROLS_FIXED_TRACKS_PX = 410;
 const REPLAY_LEVEL_ANCHOR_MIN_WIDTH_PX = 18;
 const REPLAY_LEVEL_SEPARATOR_WIDTH_PX = 8;
+const REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS = 1000;
 // The replay action stream only records trained wisps; every player starts with one.
 const BASE_WISP_COUNT = 1;
+const DEFAULT_WAVE_CREEP_COUNT = 100;
+const BOSS_WAVE_CREEP_COUNT = 12;
+const BOSS_WAVE_LEVELS = new Set([10, 20, 30]);
+const WAVE_CREEP_COUNT_OVERRIDES = new Map([[35, 2]]);
 const PLAYER_CORNER_STATS = [
-  ["level", "Level"],
   ["gold", "Gold"],
   ["lumber", "Lumber"],
+  ["wispLumberUp", "Wisps/Lumber Up"],
   ["income", "Income"],
   ["bounty", "Bounty"],
-  ["wisps", "Wisps"],
+  ["value", "Value"],
   ["builtUnits", "Built"],
   ["upgrades", "Upgrades"],
-  ["sends", "Sent"],
-  ["lumberUpgrades", "Lumber Up"],
-  ["leaks", "Leaks"],
-  ["leaksCaught", "Leaks caught"],
+  ["sends", "Sent (total)"],
+  ["leaks", "Leaks (total)"],
+  ["leaksCaught", "Leaks caught (total)"],
   ["challenges", "Challenges"],
 ];
 const ENDGAME_SCORE_COLUMNS = [
@@ -227,7 +232,9 @@ const state = {
   playStartTimeMillis: 0,
   playbackHandle: undefined,
   playbackRate: DEFAULT_PLAYBACK_RATE,
+  prepHighlightWaveLevel: undefined,
   playerEventsAnchor: undefined,
+  playerProfileRequest: undefined,
   selectedToken: undefined,
   selectedLoadStatePlayerId: undefined,
   endgameDismissed: false,
@@ -2415,6 +2422,19 @@ function playerEventsTemplate() {
   `;
 }
 
+function playerProfileButton(player, className = "player-profile-trigger") {
+  const button = document.createElement("button");
+  button.className = className;
+  button.type = "button";
+  button.dataset.playerProfile = "true";
+  button.dataset.playerId = String(player.id);
+  button.dataset.battleTag = player.battleTag || "";
+  button.textContent = playerDisplayName(player);
+  button.title = player.battleTag || player.name || "";
+  button.setAttribute("aria-label", `Open profile for ${player.name || player.battleTag || "player"}`);
+  return button;
+}
+
 function applyReplayTeams() {
   if (!state.replay?.teams?.length || !teamOverlay) return;
 
@@ -2433,7 +2453,9 @@ function applyReplayTeams() {
       for (const player of team.players) {
         const row = document.createElement("div");
         row.className = "team-overlay__player";
-        row.textContent = playerDisplayName(player);
+        row.dataset.playerId = String(player.id);
+        row.dataset.battleTag = player.battleTag || "";
+        row.appendChild(playerProfileButton(player, "team-overlay__player-button"));
         section.appendChild(row);
       }
 
@@ -2478,7 +2500,11 @@ function applyPlayerCornerPanels() {
       }
       card.innerHTML = `
         <header class="player-corner-card__header">
-          <strong>${escapeHtml(playerDisplayName(player))}</strong>
+          <strong>
+            <button class="player-profile-trigger" type="button" data-player-profile="true" data-player-id="${escapeHtml(player.id)}" data-battle-tag="${escapeHtml(player.battleTag || "")}">
+              ${escapeHtml(playerDisplayName(player))}
+            </button>
+          </strong>
         </header>
         <div class="player-corner-sends" data-player-sends hidden></div>
         <div class="player-corner-card__stats">${playerCornerStatTemplate()}</div>
@@ -2671,23 +2697,26 @@ function replayLevelAnchors() {
     levelEndMillis.set(level, Math.max(levelEndMillis.get(level) ?? 0, endMillis));
   }
 
-  const maxLevel = Math.max(
-    0,
-    ...waves.map((wave) => Number(wave.level)).filter(Number.isFinite),
-    ...[...levelEndMillis.keys()].map((level) => level + 1),
-  );
+  const maxLevel = Math.max(0, ...waves.map((wave) => Number(wave.level)).filter(Number.isFinite), ...levelEndMillis.keys());
   const anchors = [];
 
   for (let level = 1; level <= maxLevel; level += 1) {
-    const timeMillis = level === 1 ? 0 : levelEndMillis.get(level - 1);
+    const timeMillis = levelEndMillis.get(level);
     if (!Number.isFinite(timeMillis)) continue;
     anchors.push({
       level,
-      timeMillis: clamp(Math.round(timeMillis + (level === 1 ? 0 : 1)), 0, state.durationMillis || 0),
+      timeMillis: clamp(Math.round(timeMillis + 1), 0, state.durationMillis || 0),
     });
   }
 
   return anchors;
+}
+
+function replayLevelOutcomeLevelAtTime(timeMillis) {
+  const millis = Number(timeMillis);
+  if (!Number.isFinite(millis)) return undefined;
+
+  return replayLevelAnchors().find((anchor) => Math.abs(Number(anchor.timeMillis) - millis) <= REPLAY_LEVEL_OUTCOME_TIME_TOLERANCE_MS)?.level;
 }
 
 function updateReplayControlsTargetWidth(anchors) {
@@ -2725,8 +2754,13 @@ function renderLevelAnchors() {
     button.dataset.level = String(anchor.level);
     button.dataset.timeMillis = String(anchor.timeMillis);
     button.textContent = String(anchor.level);
-    button.title = `Go to level ${anchor.level} build (${formatReplayTime(anchor.timeMillis)})`;
-    button.setAttribute("aria-label", `Go to level ${anchor.level} build at ${formatReplayTime(anchor.timeMillis)}`);
+    button.title = `Go to level ${anchor.level} outcome (${formatReplayTime(anchor.timeMillis)})`;
+    button.setAttribute("aria-label", `Go to level ${anchor.level} outcome at ${formatReplayTime(anchor.timeMillis)}`);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      seekReplayLevelOutcome(button);
+    });
     levelAnchors.appendChild(button);
   }
 
@@ -2856,6 +2890,97 @@ function waveStatusAtTime(timeMillis = state.timeMillis) {
   return { phase: "complete", previousWave: previous };
 }
 
+function waveForLevel(level) {
+  const normalizedLevel = Number(level);
+  if (!Number.isFinite(normalizedLevel)) return undefined;
+  return (state.replayIndex.waveEvents || []).find((wave) => Number(wave.level) === normalizedLevel);
+}
+
+function reviewWaveLevelAtTime(timeMillis = state.timeMillis) {
+  const explicitLevel = Number(state.prepHighlightWaveLevel);
+  if (Number.isFinite(explicitLevel)) return explicitLevel;
+  if (state.playbackHandle !== undefined) return undefined;
+  return replayLevelOutcomeLevelAtTime(timeMillis);
+}
+
+function reviewWaveAtTime(timeMillis = state.timeMillis) {
+  return waveForLevel(reviewWaveLevelAtTime(timeMillis));
+}
+
+function previousWaveForLevel(level) {
+  const normalizedLevel = Number(level);
+  if (!Number.isFinite(normalizedLevel)) return undefined;
+  const waves = state.replayIndex.waveEvents || [];
+  const index = waves.findIndex((wave) => Number(wave.level) === normalizedLevel);
+  return index > 0 ? waves[index - 1] : undefined;
+}
+
+function prepWindowForWave(wave, currentMillis = Number(wave?.startMillis)) {
+  if (!wave) return null;
+
+  const previousEndMillis = Number(previousWaveForLevel(wave.level)?.endMillis);
+  const startMillis = Number.isFinite(previousEndMillis) ? previousEndMillis : 0;
+  const endMillis = Number(wave.startMillis);
+  const windowCurrentMillis = Number(currentMillis);
+
+  return Number.isFinite(endMillis)
+    ? {
+        startMillis,
+        endMillis,
+        currentMillis: Number.isFinite(windowCurrentMillis) ? Math.min(windowCurrentMillis, endMillis) : endMillis,
+        nextWave: wave,
+      }
+    : null;
+}
+
+function prepWindowAtTime(timeMillis = state.timeMillis) {
+  const highlightedWave = reviewWaveAtTime(timeMillis);
+  if (highlightedWave) return prepWindowForWave(highlightedWave);
+
+  const status = waveStatusAtTime(timeMillis);
+  if (status.phase === "build" && status.nextWave) return prepWindowForWave(status.nextWave, timeMillis);
+  if (status.phase === "wave" && status.wave) return prepWindowForWave(status.wave);
+  if (status.phase === "complete" && status.previousWave) return prepWindowForWave(status.previousWave);
+
+  return null;
+}
+
+function prepWindowContainsMillis(prepWindow, timeMillis) {
+  const millis = Number(timeMillis);
+  if (!prepWindow || !Number.isFinite(millis)) return false;
+  return millis >= prepWindow.startMillis && millis <= prepWindow.currentMillis && millis < prepWindow.endMillis;
+}
+
+function tokenIsInGreenBuildCell(token) {
+  if (token.isKing) return false;
+  return displayKindAt(token.centerCellX, token.centerCellY) === "green";
+}
+
+function tokenChangedInPrep(token, prepWindow, { builtOnly = false } = {}) {
+  if (!prepWindow || token.isKing || !tokenIsInGreenBuildCell(token) || !isTokenActiveAtTime(token)) return false;
+
+  const states = Array.isArray(token.unitStates) ? token.unitStates : [];
+  return states.some((unitState, index) => {
+    if (builtOnly && index > 0) return false;
+    return prepWindowContainsMillis(prepWindow, unitState.timeMillis);
+  });
+}
+
+function prepBuiltRollUnitTypesForPlayer(playerId, prepWindow = prepWindowAtTime()) {
+  const unitTypes = new Set();
+  if (!prepWindow) return unitTypes;
+
+  for (const token of state.tokens || []) {
+    if (Number(token.playerId) !== Number(playerId)) continue;
+    if (!tokenChangedInPrep(token, prepWindow, { builtOnly: true })) continue;
+    const initialState = Array.isArray(token.unitStates) ? token.unitStates[0] : undefined;
+    const unitType = initialState?.unitType || token.id;
+    if (unitType) unitTypes.add(unitType);
+  }
+
+  return unitTypes;
+}
+
 function waveDisplayName(wave) {
   if (!wave) return "Wave";
   return wave.creepName ? `Wave ${wave.level}: ${wave.creepName}` : `Wave ${wave.level}`;
@@ -2917,6 +3042,16 @@ function updateWaveStatus() {
   waveStatus.hidden = false;
   waveStatus.dataset.phase = status.phase;
 
+  const reviewWave = reviewWaveAtTime();
+  if (reviewWave) {
+    waveStatus.dataset.phase = "review";
+    wavePhase.textContent = "Review";
+    waveTitle.textContent = waveDisplayName(reviewWave);
+    waveTimer.textContent = "";
+    waveDetail.textContent = waveDetailText(reviewWave, Number.POSITIVE_INFINITY);
+    return;
+  }
+
   if (status.phase === "wave") {
     const remaining = status.remainingMillis === undefined ? "" : `Ends in ${formatReplayCompactTime(status.remainingMillis)}`;
     wavePhase.textContent = "Wave in progress";
@@ -2951,6 +3086,9 @@ function sendTargetWaveForTime(timeMillis) {
 }
 
 function activeSendWaveAtTime(timeMillis = state.timeMillis) {
+  const reviewWave = reviewWaveAtTime(timeMillis);
+  if (reviewWave) return reviewWave;
+
   const status = waveStatusAtTime(timeMillis);
   if (status.phase === "build") return status.nextWave;
   if (status.phase === "wave") return status.wave;
@@ -2973,17 +3111,21 @@ function opposingTeamIndexForPlayerId(playerId) {
   return opponentIndex >= 0 ? opponentIndex : undefined;
 }
 
-function sendGroupsForWaveFromTeam(wave, senderTeamIndex, timeMillis = Number.POSITIVE_INFINITY) {
+function unitSendsForWaveFromTeam(wave, senderTeamIndex, timeMillis = Number.POSITIVE_INFINITY) {
   if (!wave || senderTeamIndex === undefined) return [];
 
+  return (state.replayIndex.unitSends || []).filter((send) => {
+    if (send.teamId === null || send.teamId === undefined) return false;
+    if (Number(send.teamId) !== Number(senderTeamIndex)) return false;
+    if (Number(send.timeMillis) > Number(timeMillis)) return false;
+    return sendTargetWaveForTime(send.timeMillis)?.level === wave.level;
+  });
+}
+
+function sendGroupsForWaveFromTeam(wave, senderTeamIndex, timeMillis = Number.POSITIVE_INFINITY) {
   const groupsByType = new Map();
 
-  for (const send of state.replayIndex.unitSends || []) {
-    if (send.teamId === null || send.teamId === undefined) continue;
-    if (Number(send.teamId) !== Number(senderTeamIndex)) continue;
-    if (Number(send.timeMillis) > Number(timeMillis)) continue;
-    if (sendTargetWaveForTime(send.timeMillis)?.level !== wave.level) continue;
-
+  for (const send of unitSendsForWaveFromTeam(wave, senderTeamIndex, timeMillis)) {
     const unitType = send.unitType || "unknown";
     const group =
       groupsByType.get(unitType) ||
@@ -3028,8 +3170,78 @@ function sendGroupSummary(groups, emptyText = "No sends") {
   return parts.join(" / ");
 }
 
+function sendPanelSummaryForWaveFromTeam(wave, senderTeamIndex, timeMillis = Number.POSITIVE_INFINITY, emptyText = "No sends") {
+  const sends = unitSendsForWaveFromTeam(wave, senderTeamIndex, timeMillis);
+  const sendCount = sends.length;
+  if (!sendCount) return emptyText;
+
+  const senderCount = new Set(sends.map((send) => Number(send.playerId))).size;
+  return `${compactNumber(sendCount)} send${sendCount === 1 ? "" : "s"}${
+    senderCount > 0 ? ` from ${compactNumber(senderCount)} sender${senderCount === 1 ? "" : "s"}` : ""
+  }`;
+}
+
 function sendWaveLabel(wave) {
   return wave ? `Wave ${wave.level}` : "Wave";
+}
+
+function waveBaseCreepCount(wave) {
+  if (!wave) return 0;
+
+  const explicitCount = Number(wave.creep?.count ?? wave.creepCount ?? wave.count);
+  if (Number.isFinite(explicitCount) && explicitCount > 0) return explicitCount;
+
+  const level = Number(wave.level);
+  const overrideCount = WAVE_CREEP_COUNT_OVERRIDES.get(level);
+  if (overrideCount !== undefined) return overrideCount;
+
+  return isBossWave(wave) ? BOSS_WAVE_CREEP_COUNT : DEFAULT_WAVE_CREEP_COUNT;
+}
+
+function isBossWave(wave) {
+  const level = Number(wave?.level ?? wave?.creep?.level);
+  return Number.isFinite(level) && BOSS_WAVE_LEVELS.has(level);
+}
+
+function leakPercent(leakedCount, totalCount) {
+  const total = Number(totalCount);
+  if (!Number.isFinite(total) || total <= 0) return "";
+  const leaked = clamp(Number(leakedCount) || 0, 0, total);
+  return `${Math.round((leaked / total) * 100)}%`;
+}
+
+function leakSummaryText(leaks, totalIncomingCount, incomingBreakdown = "") {
+  const percent = leakPercent(leaks, totalIncomingCount);
+  const countText = `${compactNumber(leaks)}/${compactNumber(totalIncomingCount)}`;
+  const detailText = [countText, incomingBreakdown ? `from ${incomingBreakdown}` : ""].filter(Boolean).join(", ");
+  return percent ? `Leaks: ${percent} (${detailText})` : `Leaks: ${countText}`;
+}
+
+function incomingBreakdownText(creepCount, sendCount, challengeCount) {
+  const parts = [`${compactNumber(creepCount)} creeps`];
+  if (sendCount > 0) parts.push(`${compactNumber(sendCount)} send${sendCount === 1 ? "" : "s"}`);
+  if (challengeCount > 0) parts.push(`${compactNumber(challengeCount)} CC`);
+  return parts.join(", ");
+}
+
+function challengeChampionCountForPlayerWave(playerId, wave) {
+  if (!wave) return 0;
+
+  return (state.replayIndex.eventsByPlayer.get(Number(playerId)) || []).filter((event) => {
+    if (event.type !== "CHAMPION_CHALLENGED") return false;
+    return sendTargetWaveForTime(event.timeMillis)?.level === wave.level;
+  }).length;
+}
+
+function incomingSendCountForPlayerWave(playerId, wave) {
+  const senderTeamIndex = opposingTeamIndexForPlayerId(playerId);
+  if (senderTeamIndex === undefined) return 0;
+
+  return sendGroupsForWaveFromTeam(wave, senderTeamIndex).reduce((sum, group) => sum + Number(group.count || 0), 0);
+}
+
+function compactOutcomeText(parts) {
+  return parts.map((part) => part.text).join(" | ");
 }
 
 function playerWaveStat(playerId, waveOrLevel) {
@@ -3056,10 +3268,47 @@ function playerWaveOutcome(playerId, wave) {
   const level = Number(wave.level);
   const previous = Number.isFinite(level) && level > 1 ? playerWaveStat(playerId, level - 1) : undefined;
   const leaks = Math.max(0, waveStatDelta(current, previous, "leakedAmountCumulative") ?? 0);
+  const creepCount = waveBaseCreepCount(wave);
+  const sendCount = incomingSendCountForPlayerWave(playerId, wave);
+  const challengeCount = challengeChampionCountForPlayerWave(playerId, wave);
+  const totalIncomingCount = creepCount + sendCount + challengeCount;
+  const hasExtraIncoming = sendCount > 0 || challengeCount > 0;
+
+  if (leaks <= 0) {
+    const parts = [{ text: "Clear", tone: "good" }];
+    if (challengeCount > 0) parts.push({ text: "Killed CC", tone: "good" });
+    return {
+      level,
+      text: compactOutcomeText(parts),
+      tone: "good",
+      parts,
+    };
+  }
+
+  if (hasExtraIncoming) {
+    const nonChallengeIncomingCount = creepCount + sendCount;
+    const parts = [
+      {
+        text: leakSummaryText(leaks, totalIncomingCount, incomingBreakdownText(creepCount, sendCount, challengeCount)),
+        tone: "bad",
+      },
+    ];
+
+    if (challengeCount > 0 && leaks > nonChallengeIncomingCount) {
+      parts.push({ text: "Leaked CC", tone: "cc" });
+    }
+
+    return {
+      level,
+      text: compactOutcomeText(parts),
+      tone: "bad",
+      parts,
+    };
+  }
 
   return {
     level,
-    text: leaks > 0 ? `Leaks: ${compactNumber(leaks)}` : "Clear",
+    text: leakSummaryText(leaks, creepCount),
     tone: leaks > 0 ? "bad" : "good",
   };
 }
@@ -3071,10 +3320,27 @@ function playerIncomingSendState(playerId, timeMillis = state.timeMillis) {
   const status = waveStatusAtTime(timeMillis);
   if (status.phase === "none") return undefined;
 
+  const reviewWave = reviewWaveAtTime(timeMillis);
+  if (reviewWave) {
+    const groups = sendGroupsForWaveFromTeam(reviewWave, senderTeamIndex);
+    return {
+      title: `${sendWaveLabel(reviewWave)} review`,
+      detail: sendPanelSummaryForWaveFromTeam(reviewWave, senderTeamIndex),
+      wave: reviewWave,
+      creep: waveCreepForWave(reviewWave),
+      groups,
+      emptyText: "No sends",
+      outcomeLabel: "Outcome",
+      previousOutcome: playerWaveOutcome(playerId, reviewWave),
+      isReview: true,
+    };
+  }
+
   if (status.phase === "complete") {
     const groups = sendGroupsForWaveFromTeam(status.previousWave, senderTeamIndex);
     return {
       title: status.previousWave ? `${sendWaveLabel(status.previousWave)} summary` : "Summary",
+      detail: sendPanelSummaryForWaveFromTeam(status.previousWave, senderTeamIndex),
       wave: status.previousWave,
       creep: waveCreepForWave(status.previousWave),
       groups,
@@ -3085,14 +3351,17 @@ function playerIncomingSendState(playerId, timeMillis = state.timeMillis) {
 
   const wave = activeSendWaveAtTime(timeMillis);
   const groups = sendGroupsForWaveFromTeam(wave, senderTeamIndex, timeMillis);
+  const emptyText = Number(timeMillis) < Number(wave?.startMillis || 0) ? "No incoming yet" : "No incoming";
+  const sendSummaryEmptyText = Number(timeMillis) < Number(wave?.startMillis || 0) ? "No sends yet" : "No sends";
 
   return {
     title: wave ? `Incoming ${sendWaveLabel(wave)}` : "Incoming",
+    detail: sendPanelSummaryForWaveFromTeam(wave, senderTeamIndex, timeMillis, sendSummaryEmptyText),
     wave,
     creep: waveCreepForWave(wave),
     previousWave: status.previousWave,
     groups,
-    emptyText: Number(timeMillis) < Number(wave?.startMillis || 0) ? "No incoming yet" : "No incoming",
+    emptyText,
     previousSummary: status.previousWave ? `Last ${sendWaveLabel(status.previousWave)}` : "",
     previousOutcome: playerWaveOutcome(playerId, status.previousWave),
   };
@@ -3238,6 +3507,7 @@ function stepPlaybackRate(direction) {
 
 function startPlayback() {
   if (state.durationMillis <= 0) return;
+  state.prepHighlightWaveLevel = undefined;
   if (state.playbackHandle !== undefined) {
     cancelAnimationFrame(state.playbackHandle);
   }
@@ -3268,6 +3538,16 @@ function seekReplayTime(milliseconds) {
   }
 }
 
+function seekReplayLevelOutcome(button) {
+  const level = Number(button.dataset.level);
+  const timeMillis = Number(button.dataset.timeMillis);
+  if (!Number.isFinite(level) || !Number.isFinite(timeMillis)) return;
+
+  pausePlayback();
+  state.prepHighlightWaveLevel = level;
+  seekReplayTime(timeMillis);
+}
+
 function tickPlayback(now) {
   const elapsed = now - (state.playStartMillis ?? now);
   const nextTime = (state.playStartTimeMillis ?? 0) + elapsed * (Number(state.playbackRate) || DEFAULT_PLAYBACK_RATE);
@@ -3293,6 +3573,232 @@ function playerForId(playerId) {
 function playerDisplayName(player) {
   if (!player) return "";
   return player.elo === null || player.elo === undefined ? player.name : `${player.name} (${player.elo})`;
+}
+
+function playerProfileFromTrigger(trigger) {
+  const playerId = Number(trigger?.dataset?.playerId ?? trigger?.closest?.("[data-player-id]")?.dataset?.playerId);
+  const battleTag = trigger?.dataset?.battleTag || trigger?.closest?.("[data-battle-tag]")?.dataset?.battleTag || "";
+  const player = Number.isFinite(playerId) ? playerForId(playerId) : undefined;
+
+  return player || { id: playerId, battleTag, name: battleTag.split("#")[0] || battleTag || "Player", elo: null };
+}
+
+function openPlayerProfileFromClick(event) {
+  const trigger = event.target?.closest?.("[data-player-profile]");
+  if (!trigger) return false;
+
+  event.preventDefault();
+  event.stopPropagation();
+  openPlayerProfilePopover(playerProfileFromTrigger(trigger));
+  return true;
+}
+
+function openPlayerProfilePopover(player) {
+  if (!player?.battleTag) return;
+
+  closePlayerEventsPopover();
+  if (openParentPlayerProfile(player)) return;
+
+  if (!playerProfilePopover) return;
+  state.playerProfileRequest?.abort?.();
+  const controller = new AbortController();
+  state.playerProfileRequest = controller;
+  playerProfilePopover.hidden = false;
+  playerProfilePopover.innerHTML = playerProfileLoadingTemplate(player);
+
+  const params = new URLSearchParams({ battleTag: player.battleTag });
+  fetch(`/api/player-profile?${params.toString()}`, { signal: controller.signal })
+    .then(async (response) => {
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || "Unable to load profile");
+      return payload;
+    })
+    .then((profile) => {
+      if (state.playerProfileRequest !== controller) return;
+      playerProfilePopover.innerHTML = playerProfileTemplate(profile);
+    })
+    .catch((error) => {
+      if (controller.signal.aborted || state.playerProfileRequest !== controller) return;
+      playerProfilePopover.innerHTML = playerProfileErrorTemplate(player, error);
+    });
+}
+
+function openParentPlayerProfile(player) {
+  if (window.parent === window) return false;
+
+  const targetOrigin = window.location.origin === "null" ? "*" : window.location.origin;
+  window.parent.postMessage(
+    {
+      type: "legionOpenPlayerProfile",
+      battleTag: player.battleTag,
+    },
+    targetOrigin,
+  );
+  return true;
+}
+
+function closePlayerProfilePopover() {
+  state.playerProfileRequest?.abort?.();
+  state.playerProfileRequest = undefined;
+  if (!playerProfilePopover) return;
+  playerProfilePopover.hidden = true;
+  playerProfilePopover.replaceChildren();
+}
+
+function playerProfileLoadingTemplate(player) {
+  return `
+    <header class="replay-player-profile__header">
+      <div>
+        <strong>${escapeHtml(player.name || player.battleTag)}</strong>
+        <span>${escapeHtml(player.battleTag)}</span>
+      </div>
+      <button class="replay-player-profile__close" type="button" data-player-profile-close aria-label="Close player profile">×</button>
+    </header>
+    <div class="replay-player-profile__status">Loading profile...</div>
+  `;
+}
+
+function playerProfileErrorTemplate(player, error) {
+  const message = error instanceof Error ? error.message : "Unable to load profile";
+
+  return `
+    <header class="replay-player-profile__header">
+      <div>
+        <strong>${escapeHtml(player.name || player.battleTag)}</strong>
+        <span>${escapeHtml(player.battleTag)}</span>
+      </div>
+      <button class="replay-player-profile__close" type="button" data-player-profile-close aria-label="Close player profile">×</button>
+    </header>
+    <div class="replay-player-profile__status replay-player-profile__status--error">${escapeHtml(message)}</div>
+  `;
+}
+
+function playerProfileTemplate(profile) {
+  const current = profile?.w3c?.current;
+  const local = profile?.local || {};
+  const topPercent = replayProfileTopPercent(current?.topPercent);
+  const modeRows = (profile?.w3c?.modes || [])
+    .slice(0, 3)
+    .map(
+      (mode) => `
+        <div class="replay-player-profile__row">
+          <span>${escapeHtml(mode.label)}</span>
+          <strong>${escapeHtml(compactNumber(mode.mmr))}</strong>
+          <small>${escapeHtml(mode.wins)}-${escapeHtml(mode.losses)} (${escapeHtml(replayProfilePercent(mode.winrate))})</small>
+        </div>
+      `,
+    )
+    .join("");
+
+  return `
+    <header class="replay-player-profile__header">
+      <div>
+        <strong>${escapeHtml(profile.name || profile.battleTag)}</strong>
+        <span>${escapeHtml(profile.battleTag)}</span>
+      </div>
+      <a href="${escapeHtml(profile.w3cProfileUrl)}" target="_blank" rel="noreferrer">W3C</a>
+      <button class="replay-player-profile__close" type="button" data-player-profile-close aria-label="Close player profile">×</button>
+    </header>
+    <div class="replay-player-profile__stats">
+      ${replayProfileStat("W3C MMR", compactNumber(current?.mmr), "accent")}
+      ${replayProfileStat("W3C Rank", current?.rank ? `#${compactNumber(current.rank)}` : "-")}
+      ${replayProfileStat("W3C W/L", current ? `${current.wins}-${current.losses}` : "-")}
+      ${replayProfileStat("W3C Games", compactNumber(current?.games))}
+      ${replayProfileStat("Avg Value", compactNumber(local.averageValue))}
+    </div>
+    <div class="replay-player-profile__meta">
+      <span>Season ${escapeHtml(profile?.w3c?.season ?? "-")}</span>
+      ${topPercent ? `<span>${escapeHtml(topPercent)}</span>` : ""}
+      <span>Last w3champions game ${escapeHtml(replayProfileDate(local.lastGameAt))}</span>
+    </div>
+    <section>
+      <h3>W3C ladders</h3>
+      ${modeRows || `<p>No W3C ladder stats found.</p>`}
+    </section>
+    <div class="replay-player-profile__columns">
+      ${replayProfileUnitSection("Favorites", local.favoriteRolls || [])}
+      ${replayProfileUnitSection("Opening units", local.favoriteOpeners || [])}
+    </div>
+    ${profile.fetchError ? `<p class="replay-player-profile__warning">${escapeHtml(profile.fetchError)}</p>` : ""}
+  `;
+}
+
+function replayProfileStat(label, value, tone = "") {
+  return `
+    <div class="replay-player-profile__stat" data-tone="${escapeHtml(tone)}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function replayProfileUnitSection(title, items) {
+  if (!items.length) {
+    return `
+      <section>
+        <h3>${escapeHtml(title)}</h3>
+        <p>No data yet.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section>
+      <h3>${escapeHtml(title)}</h3>
+      <div class="replay-player-profile__units">
+        ${items
+          .slice(0, 6)
+          .map(
+            (item) => `
+              <div class="replay-player-profile__unit" title="${escapeHtml(replayProfileUnitTitle(item))}">
+                <img alt="" src="${escapeHtml(item.iconPath)}" />
+                <span>${escapeHtml(replayProfilePercent(item.percent))}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function replayProfileUnitTitle(item) {
+  const seen = Number(item?.seen);
+  const count = Number(item?.count);
+  const unitName = item?.unitName || item?.unitType || "Unit";
+
+  if (Number.isFinite(seen) && seen > 0 && Number.isFinite(count)) {
+    if (item?.metric === "opening-pick") {
+      return `${unitName}: opened ${compactNumber(count)}/${compactNumber(seen)} games when in opening roll`;
+    }
+
+    return `${unitName}: built ${compactNumber(count)}/${compactNumber(seen)} games when rolled`;
+  }
+
+  return `${unitName}${Number.isFinite(count) ? ` (${compactNumber(count)})` : ""}`;
+}
+
+function replayProfilePercent(value) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return "-";
+  return `${Math.round(numberValue * 100)}%`;
+}
+
+function replayProfileTopPercent(value) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return "";
+  return `Top ${Math.max(0.1, numberValue).toFixed(numberValue < 1 ? 1 : 0)}%`;
+}
+
+function replayProfileDate(value) {
+  if (!value) return "-";
+  const [datePart, timePart = ""] = String(value).split(" ");
+  const [, month, day] = datePart.split("-");
+  const monthName = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][
+    Number(month) - 1
+  ];
+
+  return monthName && day ? `${Number(day)} ${monthName}${timePart ? ` ${timePart.slice(0, 5)}` : ""}` : value;
 }
 
 function playerSlotColor(playerId) {
@@ -3471,6 +3977,8 @@ function playerCurrentStats(playerId) {
   const { current: stats, previous } = snapshotPairAtOrBefore(statRows);
   const economyEvents = state.replayIndex.economyByPlayer.get(Number(playerId)) || [];
   const resourceStats = playerResourceStatsAt(playerId);
+  const wisps = playerWispCountAt(playerId);
+  const lumberUpgrades = countAtOrBefore(economyEvents, state.timeMillis, (event) => event.type === "LUMBER_UPGRADE");
   const totalLeaks = stats?.leakedAmountCumulative;
   const previousLeaks = previous?.leakedAmountCumulative ?? 0;
   const totalCaught = stats?.leaksCaught;
@@ -3482,8 +3990,9 @@ function playerCurrentStats(playerId) {
     level: playerLevelAtTime(statRows),
     gold: resourceStats.gold,
     lumber: resourceStats.lumber,
+    wispLumberUp: `${compactNumber(wisps)}/${compactNumber(lumberUpgrades)}`,
     income: resourceStats.income,
-    wisps: playerWispCountAt(playerId),
+    wisps,
     currentLeaks,
     totalLeaks,
     leaks: totalLeaks,
@@ -3492,7 +4001,7 @@ function playerCurrentStats(playerId) {
     leaksCaught: stats?.leaksCaught,
     currentCaught,
     totalCaught,
-    lumberUpgrades: countAtOrBefore(economyEvents, state.timeMillis, (event) => event.type === "LUMBER_UPGRADE"),
+    lumberUpgrades,
     builtUnits: countPlayerEventsAtOrBefore(playerId, "UNIT_BUILD"),
     upgrades: countPlayerEventsAtOrBefore(playerId, "UNIT_UPGRADE"),
     sends: countPlayerEventsAtOrBefore(playerId, "UNIT_SEND"),
@@ -3864,6 +4373,23 @@ function selectionStatsHtml(stats) {
   `;
 }
 
+function outcomeContentNodes(outcome) {
+  const parts = outcome?.parts?.length ? outcome.parts : outcome?.text ? [{ text: outcome.text, tone: outcome.tone }] : [];
+  return parts.flatMap((part, index) => {
+    const item = document.createElement("span");
+    item.className = "player-corner-outcome-part";
+    item.textContent = part.text;
+    if (part.tone) item.dataset.tone = part.tone;
+
+    if (index === 0) return [item];
+
+    const separator = document.createElement("span");
+    separator.className = "player-corner-outcome-separator";
+    separator.textContent = "|";
+    return [separator, item];
+  });
+}
+
 function renderPlayerIncomingSends(card, playerId) {
   const panel = card.querySelector("[data-player-sends]");
   if (!panel) return;
@@ -3891,7 +4417,9 @@ function renderPlayerIncomingSends(card, playerId) {
   const key = [
     state.iconMode,
     incoming.title,
+    incoming.detail,
     incoming.emptyText,
+    incoming.outcomeLabel,
     incoming.previousSummary,
     visibleCreep ? `${visibleCreep.unitType}:${visibleCreep.unitName}:${visibleCreep.iconPath}` : "",
     incoming.previousOutcome ? `${incoming.previousOutcome.text}:${incoming.previousOutcome.tone ?? ""}` : "",
@@ -3911,6 +4439,13 @@ function renderPlayerIncomingSends(card, playerId) {
   title.textContent = incoming.title;
 
   header.append(title);
+
+  if (incoming.detail) {
+    const detail = document.createElement("span");
+    detail.className = "player-corner-sends__meta";
+    detail.textContent = incoming.detail;
+    header.append(detail);
+  }
 
   const iconRow = document.createElement("div");
   iconRow.className = "player-corner-sends__icons";
@@ -4005,19 +4540,22 @@ function renderPlayerIncomingSends(card, playerId) {
 
   panel.replaceChildren(header, iconRow);
 
-  if (incoming.previousSummary) {
+  const outcomeLabel = incoming.outcomeLabel || incoming.previousSummary;
+  if (outcomeLabel) {
     const previous = document.createElement("div");
-    previous.className = "player-corner-sends__previous";
-    if (incoming.previousOutcome?.tone) previous.dataset.tone = incoming.previousOutcome.tone;
-    previous.textContent = incoming.previousOutcome?.text ? `${incoming.previousSummary}: ${incoming.previousOutcome.text}` : incoming.previousSummary;
+    previous.className = incoming.isReview ? "player-corner-wave-summary" : "player-corner-sends__previous";
+    if (incoming.previousOutcome?.text) {
+      previous.append(document.createTextNode(`${outcomeLabel}: `), ...outcomeContentNodes(incoming.previousOutcome));
+    } else {
+      previous.textContent = outcomeLabel;
+    }
     panel.appendChild(previous);
   }
 
-  if (!incoming.previousSummary && incoming.previousOutcome?.text) {
+  if (!outcomeLabel && incoming.previousOutcome?.text) {
     const summary = document.createElement("div");
     summary.className = "player-corner-wave-summary";
-    if (incoming.previousOutcome.tone) summary.dataset.tone = incoming.previousOutcome.tone;
-    summary.textContent = incoming.previousOutcome.text;
+    summary.append(...outcomeContentNodes(incoming.previousOutcome));
     panel.appendChild(summary);
   }
 }
@@ -4073,7 +4611,9 @@ function renderPlayerRoll(card, playerId) {
     return;
   }
 
-  const key = `${playerRoll.actionId}:${state.iconMode}:${units.map((unit) => unit.unitType).join(",")}`;
+  const prepBuiltUnitTypes = prepBuiltRollUnitTypesForPlayer(playerId);
+  const prepBuiltKey = [...prepBuiltUnitTypes].sort().join(",");
+  const key = `${playerRoll.actionId}:${state.iconMode}:${units.map((unit) => unit.unitType).join(",")}:${prepBuiltKey}`;
   roll.hidden = false;
   if (roll.dataset.rollKey === key) return;
 
@@ -4086,6 +4626,7 @@ function renderPlayerRoll(card, playerId) {
       item.title = unit.unitName || unit.unitType;
       item.setAttribute("aria-label", unit.unitName || unit.unitType);
       item.dataset.unitType = unit.unitType;
+      if (prepBuiltUnitTypes.has(unit.unitType)) item.dataset.prepBuilt = "true";
 
       const image = document.createElement("img");
       image.alt = "";
@@ -4849,6 +5390,7 @@ function positionTokens() {
   const rect = board.getBoundingClientRect();
   const current = frame();
   const cellSize = rect.width / current.width;
+  const prepWindow = prepWindowAtTime();
   for (const token of state.tokens) {
     if (!token.element) continue;
     if (!token.isKing) updateUnitTokenForTime(token);
@@ -4860,6 +5402,7 @@ function positionTokens() {
       token.cellY < current.y + current.height &&
       isTokenActiveAtTime(token);
     token.element.dataset.hidden = visible ? "false" : "true";
+    token.element.dataset.prepChanged = visible && tokenChangedInPrep(token, prepWindow) ? "true" : "false";
     if (!visible) continue;
     const size = Math.max(10, Math.round(cellSize * (token.span || 1)));
     const left = Math.round((tokenX - current.x) * cellSize);
@@ -5320,7 +5863,7 @@ function blocksMapDrag(target) {
     target === minimap ||
     Boolean(
       target.closest(
-        ".unit-token, .player-events__more, .player-events-popover, .selection-card, .map-minimap, button, input, select, textarea, a",
+        ".unit-token, .player-events__more, .player-events-popover, .player-profile-popover, .selection-card, .map-minimap, button, input, select, textarea, a",
       ),
     )
   );
@@ -5384,7 +5927,7 @@ board.addEventListener("pointercancel", () => {
 board.addEventListener(
   "wheel",
   (event) => {
-    if (event.target.closest(".player-events-popover")) return;
+    if (event.target.closest(".player-events-popover, .player-profile-popover")) return;
     event.preventDefault();
     const anchor = boardCellFromEvent(event);
     setZoom(state.zoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP), anchor);
@@ -5418,9 +5961,12 @@ board.addEventListener("click", (event) => {
     state.selectedToken = undefined;
   }
   if (!event.target.closest(".team-overlay, .player-corner-overlay, .player-events-popover")) closePlayerEventsPopover();
+  if (!event.target.closest(".team-overlay, .player-corner-overlay, .player-profile-popover")) closePlayerProfilePopover();
 });
 
 teamOverlay?.addEventListener("click", (event) => {
+  if (openPlayerProfileFromClick(event)) return;
+
   const button = event.target.closest("[data-player-event-more]");
   if (!button) return;
   event.stopPropagation();
@@ -5430,12 +5976,21 @@ teamOverlay?.addEventListener("click", (event) => {
 });
 
 playerCornerOverlay?.addEventListener("click", (event) => {
+  if (openPlayerProfileFromClick(event)) return;
+
   const button = event.target.closest("[data-player-event-more]");
   if (!button) return;
   event.stopPropagation();
   const card = button.closest(".player-corner-card[data-player-id]");
   if (!card) return;
   openPlayerEventsPopover(Number(card.dataset.playerId), card);
+});
+
+playerProfilePopover?.addEventListener("click", (event) => {
+  const close = event.target.closest("[data-player-profile-close]");
+  if (!close) return;
+  event.stopPropagation();
+  closePlayerProfilePopover();
 });
 
 playerEventsPopover?.addEventListener("click", (event) => {
@@ -5452,12 +6007,13 @@ for (const button of iconModeButtons) {
   button.addEventListener("click", () => setIconMode(button.dataset.iconMode));
 }
 replayTime.addEventListener("input", () => {
+  state.prepHighlightWaveLevel = undefined;
   seekReplayTime(Number(replayTime.value));
 });
 levelAnchors?.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-time-millis]");
   if (!button) return;
-  seekReplayTime(Number(button.dataset.timeMillis));
+  seekReplayLevelOutcome(button);
 });
 replayPlay.addEventListener("click", () => {
   if (state.playbackHandle === undefined) {

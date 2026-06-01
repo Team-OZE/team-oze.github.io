@@ -1,6 +1,10 @@
 import type { RowDataPacket } from "mysql2";
 import { getDatabasePool } from "./database";
-import { getPlayerEloMap, normalizeBattleTag } from "./playerElo";
+import {
+  cachedW3ChampionsMmrForMode,
+  getCachedW3ChampionsMmrByModeMap,
+  w3ChampionsGameModeForTeamSize
+} from "./playerElo";
 import { unitTooltipDetail, unitTooltipDetailById, type UnitTooltipDetail, type UnitTooltipStats } from "./unitTooltipDetails";
 import { iconPathForUnit } from "./unitIcons";
 import { displayNameForUnit } from "./unitOverrides";
@@ -646,12 +650,13 @@ export async function getReplayViewerData(id: string): Promise<ReplayViewerData 
     [matchId]
   );
   const rollUnitDetails = await loadUnitDetails(playerRollRows.flatMap(rollUnitIds), pool);
-  const playerEloByBattleTag = await getPlayerEloMap();
+  const w3cGameMode = w3ChampionsGameModeForTeamSize(Math.ceil(players.length / 2));
+  const playerMmrByBattleTag = await getCachedW3ChampionsMmrByModeMap(players.map((player) => player.battleTag));
   const playerList = players.map((player) => ({
     id: Number(player.playerId),
     battleTag: player.battleTag,
     name: playerName(player.battleTag),
-    elo: playerEloByBattleTag.get(normalizeBattleTag(player.battleTag)) ?? null
+    elo: cachedW3ChampionsMmrForMode(playerMmrByBattleTag, player.battleTag, w3cGameMode)
   }));
   const winningTeamId = match.winningTeamId === null ? null : Number(match.winningTeamId);
   const teams = buildTeams(playerList, winningTeamId);

@@ -68,9 +68,168 @@ type PlayerSearchResult = {
   groups: PlayerSearchGroup[];
 };
 
+type PlayerModeStat = {
+  gameMode: number;
+  label: string;
+  mmr: number | null;
+  rank: number | null;
+  rankingPoints: number | null;
+  topPercent: number | null;
+  wins: number;
+  losses: number;
+  games: number;
+  winrate: number | null;
+};
+
+type PlayerRaceStat = {
+  race: number;
+  label: string;
+  wins: number;
+  losses: number;
+  games: number;
+  winrate: number | null;
+};
+
+type UnitPreference = {
+  unitType: string;
+  unitName: string;
+  iconPath: string;
+  count: number;
+  metric?: "roll-pick" | "opening-pick";
+  seen?: number;
+  percent: number | null;
+};
+
+type LocalModeStat = {
+  mode: string;
+  gameMode: string;
+  games: number;
+  wins: number;
+  losses: number;
+  winrate: number | null;
+};
+
+type RecentGamePlayer = {
+  id: number;
+  battleTag: string | null;
+  name: string;
+  isProfilePlayer?: boolean;
+};
+
+type RecentGameTeam = {
+  id: number;
+  result: "win" | "loss" | "unknown";
+  players: RecentGamePlayer[];
+};
+
+type RecentGame = {
+  id: number;
+  matchId: string;
+  startedAt: string;
+  duration: string;
+  mode: string;
+  gameMode: string;
+  result: "win" | "loss" | "unknown";
+  profileTeamId?: number;
+  teams?: RecentGameTeam[];
+  teammates: string[];
+  opponents: string[];
+};
+
+type LocalPlayerProfileStats = {
+  games: number;
+  wins: number;
+  losses: number;
+  winrate: number | null;
+  lastGameAt: string | null;
+  averageValue: number | null;
+  averageIncome: number | null;
+  averageLeak: number | null;
+  modes: LocalModeStat[];
+  favoriteRolls: UnitPreference[];
+  favoriteOpeners: UnitPreference[];
+  recentGames: RecentGame[];
+};
+
+type PlayerRivalry = {
+  battleTag: string;
+  name: string;
+  games: number;
+  wins: number;
+  losses: number;
+  winrate: number | null;
+};
+
+type PlayerRivalryGroup = {
+  matchCount?: number;
+  mostPlayed: PlayerRivalry[];
+  mostDefeated: PlayerRivalry[];
+  bestWinrate: PlayerRivalry[];
+  toughest: PlayerRivalry[];
+  teammatesMostPlayed: PlayerRivalry[];
+  teammatesBestWinrate: PlayerRivalry[];
+};
+
+type PlayerRivalryMode = PlayerRivalryGroup & {
+  gameMode: number;
+  label: string;
+};
+
+type PlayerRivalries = PlayerRivalryGroup & {
+  source?: "w3champions";
+  seasons: number[];
+  startedAt: string | null;
+  endedAt: string | null;
+  modes?: PlayerRivalryMode[];
+};
+
+type PlayerProfileSeason = {
+  schemaVersion?: number;
+  season: number;
+  label: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  current: PlayerModeStat | null;
+  modes: PlayerModeStat[];
+  races: PlayerRaceStat[];
+  local: LocalPlayerProfileStats;
+  fetchError: string | null;
+  refreshedAt: string;
+};
+
+type PlayerProfilePayload = {
+  schemaVersion?: number;
+  battleTag: string;
+  name: string;
+  refreshedAt: string;
+  cacheStatus: "hit" | "refreshed" | "stale";
+  fetchError: string | null;
+  w3cProfileUrl: string;
+  selectedSeason: number | null;
+  seasons: PlayerProfileSeason[];
+  w3c: {
+    available: boolean;
+    season: number | null;
+    current: PlayerModeStat | null;
+    modes: PlayerModeStat[];
+    races: PlayerRaceStat[];
+    allTime: {
+      wins: number;
+      losses: number;
+      games: number;
+      winrate: number | null;
+    } | null;
+    participatedSeasons: number[];
+    country: string | null;
+  };
+  local: LocalPlayerProfileStats;
+  rivalries?: PlayerRivalries;
+};
+
 type ViewerSession = {
   replayGameId: string;
   initialSeekSeconds: number;
+  layer: "page" | "profile";
   title: string;
 };
 
@@ -368,6 +527,54 @@ function formatGameMode(value: string) {
   return value.replace(/^Legion TD:\s*/i, "");
 }
 
+function formatProfileNumber(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("en-US").format(Math.round(value));
+}
+
+function formatProfilePercent(value: number | null | undefined, digits = 0) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "-";
+  }
+
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+function formatTopPercent(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return `Top ${Math.max(0.1, value).toFixed(value < 1 ? 1 : 0)}%`;
+}
+
+function formatProfileDate(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+
+  const start = formatStartParts(value);
+  return `${start.date}, ${start.time}`;
+}
+
+function formatProfileDateRange(startedAt: string | null | undefined, endedAt: string | null | undefined) {
+  if (!startedAt && !endedAt) {
+    return null;
+  }
+
+  const start = startedAt ? formatStartParts(startedAt) : null;
+  const end = endedAt ? formatStartParts(endedAt) : null;
+
+  if (start && end) {
+    return `${start.date} - ${end.date}`;
+  }
+
+  return start ? `From ${start.date}` : `Until ${end?.date}`;
+}
+
 function parseSeekSeconds(value: string | null) {
   if (!value) {
     return 0;
@@ -399,6 +606,7 @@ function viewerSessionFromLocation() {
   return {
     replayGameId,
     initialSeekSeconds: parseSeekSeconds(params.get("s")),
+    layer: "page" as const,
     title: replayGameId
   };
 }
@@ -455,31 +663,41 @@ function AppLink({
   );
 }
 
-function TeamPlayers({ team }: { team: Team }) {
+function TeamPlayers({ onOpenProfile, team }: { onOpenProfile: (battleTag: string) => void; team: Team }) {
   return (
     <div className={`team team-${team.result}`}>
       {team.players.map((player) => (
         <div className="player" key={player.id} title={player.battleTag}>
           <span className="player-mark" aria-hidden="true" />
-          <span>{playerDisplayName(player)}</span>
+          <button className="player-name-button" type="button" onClick={() => onOpenProfile(player.battleTag)}>
+            {playerDisplayName(player)}
+          </button>
         </div>
       ))}
     </div>
   );
 }
 
-function ReplayRow({ replay, onOpenViewer }: { replay: Replay; onOpenViewer: (replay: Replay) => void }) {
+function ReplayRow({
+  onOpenProfile,
+  onOpenViewer,
+  replay
+}: {
+  onOpenProfile: (battleTag: string) => void;
+  onOpenViewer: (replay: Replay) => void;
+  replay: Replay;
+}) {
   const kingSpell = formatKingSpell(replay.kingSpell);
   const start = formatStartParts(replay.startedAt);
 
   return (
     <article className="replay-row">
       <div className="players-column">
-        <TeamPlayers team={replay.teams[0]} />
+        <TeamPlayers team={replay.teams[0]} onOpenProfile={onOpenProfile} />
         <div className="versus" aria-label="versus">
           VS
         </div>
-        <TeamPlayers team={replay.teams[1]} />
+        <TeamPlayers team={replay.teams[1]} onOpenProfile={onOpenProfile} />
       </div>
       <div className="mode-column" data-label="Mode">
         <strong>{formatTeamSize(replay.mode)}</strong>
@@ -514,10 +732,12 @@ function ReplayRow({ replay, onOpenViewer }: { replay: Replay; onOpenViewer: (re
 
 function ReplayViewerModal({
   onClose,
+  onOpenProfile,
   onTimeChange,
   viewer
 }: {
   onClose: () => void;
+  onOpenProfile: (battleTag: string) => void;
   onTimeChange: (replayGameId: string, timeMillis: number) => void;
   viewer: ViewerSession | null;
 }) {
@@ -529,19 +749,25 @@ function ReplayViewerModal({
     }
 
     const previousOverflow = document.body.style.overflow;
+    const captureEscape = viewer.layer === "profile";
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (captureEscape) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+
         onClose();
       }
     }
 
     document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, captureEscape);
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, captureEscape);
     };
   }, [onClose, viewer]);
 
@@ -557,7 +783,23 @@ function ReplayViewerModal({
         return;
       }
 
-      const data = event.data as { type?: string; replayGameId?: unknown; gameId?: unknown; timeMillis?: unknown };
+      const data = event.data as {
+        type?: string;
+        battleTag?: unknown;
+        replayGameId?: unknown;
+        gameId?: unknown;
+        timeMillis?: unknown;
+      };
+
+      if (data?.type === "legionOpenPlayerProfile") {
+        const battleTag = typeof data.battleTag === "string" ? data.battleTag.trim() : "";
+
+        if (battleTag) {
+          onOpenProfile(battleTag);
+        }
+
+        return;
+      }
 
       if (data?.type !== "legionReplayViewerTime") {
         return;
@@ -576,7 +818,7 @@ function ReplayViewerModal({
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [onTimeChange, viewer]);
+  }, [onOpenProfile, onTimeChange, viewer]);
 
   if (!viewer) {
     return null;
@@ -588,7 +830,13 @@ function ReplayViewerModal({
   });
 
   return (
-    <div className="viewer-modal" role="dialog" aria-modal="true" aria-label={`Replay viewer for ${viewer.title}`}>
+    <div
+      className="viewer-modal"
+      data-layer={viewer.layer}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Replay viewer for ${viewer.title}`}
+    >
       <iframe
         ref={iframeRef}
         className="viewer-modal-frame"
@@ -598,6 +846,629 @@ function ReplayViewerModal({
       <button className="viewer-modal-close" type="button" onClick={onClose} aria-label="Close replay viewer">
         <X aria-hidden="true" size={28} strokeWidth={2.2} />
       </button>
+    </div>
+  );
+}
+
+function ProfileStat({
+  label,
+  tone,
+  value
+}: {
+  label: string;
+  tone?: "good" | "bad" | "accent";
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="profile-stat" data-tone={tone}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ProfileUnitStrip({ items, title }: { items: UnitPreference[]; title: string }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="profile-section">
+      <h3>{title}</h3>
+      <div className="profile-unit-strip">
+        {items.map((item) => (
+          <div className="profile-unit" key={item.unitType} title={profileUnitTitle(item)}>
+            <img src={item.iconPath} alt="" />
+            <span>{formatProfilePercent(item.percent)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function profileUnitTitle(item: UnitPreference) {
+  if (item.seen && item.seen > 0) {
+    if (item.metric === "opening-pick") {
+      return `${item.unitName}: opened ${formatProfileNumber(item.count)}/${formatProfileNumber(item.seen)} games when in opening roll`;
+    }
+
+    return `${item.unitName}: built ${formatProfileNumber(item.count)}/${formatProfileNumber(item.seen)} games when rolled`;
+  }
+
+  return `${item.unitName} (${formatProfileNumber(item.count)})`;
+}
+
+function ProfileModeList({ modes }: { modes: PlayerModeStat[] }) {
+  if (modes.length === 0) {
+    return null;
+  }
+
+  const visibleModes = uniqueProfileModes(modes).slice(0, 3);
+
+  return (
+    <section className="profile-section">
+      <h3>W3C ladders</h3>
+      <div className="profile-mode-list">
+        {visibleModes.map((mode) => (
+          <div className="profile-mode-row" key={mode.gameMode}>
+            <span>{mode.label}</span>
+            <strong>{formatProfileNumber(mode.mmr)}</strong>
+            <small>
+              {mode.wins}-{mode.losses} ({formatProfilePercent(mode.winrate)})
+            </small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function uniqueProfileModes(modes: PlayerModeStat[]) {
+  const modesByGameMode = new Map<number, PlayerModeStat>();
+
+  for (const mode of modes) {
+    const existing = modesByGameMode.get(mode.gameMode);
+
+    if (!existing || mode.games > existing.games || (mode.games === existing.games && (mode.mmr ?? 0) > (existing.mmr ?? 0))) {
+      modesByGameMode.set(mode.gameMode, mode);
+    }
+  }
+
+  return [...modesByGameMode.values()];
+}
+
+function formatRivalryScope(rivalries: PlayerRivalries, activeGroup: PlayerRivalryGroup = rivalries) {
+  const matchCount =
+    activeGroup.matchCount && activeGroup.matchCount > 0 ? ` · ${formatProfileNumber(activeGroup.matchCount)} W3C games` : "";
+
+  if (rivalries.seasons.length === 0) {
+    return `Past 5 seasons${matchCount}`;
+  }
+
+  return `Seasons ${rivalries.seasons.slice(0, 5).join(", ")}${matchCount}`;
+}
+
+type ProfileRivalrySort = "games" | "wins" | "winrate" | "lossrate";
+
+function rivalryWinrate(rivalry: PlayerRivalry) {
+  const games = rivalry.wins + rivalry.losses;
+  return games > 0 ? rivalry.wins / games : 0;
+}
+
+function rivalryLossrate(rivalry: PlayerRivalry) {
+  const games = rivalry.wins + rivalry.losses;
+  return games > 0 ? rivalry.losses / games : 0;
+}
+
+function sortProfileRivalries(items: PlayerRivalry[], sortBy: ProfileRivalrySort) {
+  return items.slice().sort((a, b) => {
+    if (sortBy === "games") {
+      return b.games - a.games || b.wins + b.losses - (a.wins + a.losses) || a.name.localeCompare(b.name);
+    }
+
+    if (sortBy === "wins") {
+      return b.wins - a.wins || b.games - a.games || a.name.localeCompare(b.name);
+    }
+
+    if (sortBy === "lossrate") {
+      return rivalryLossrate(b) - rivalryLossrate(a) || b.losses - a.losses || b.games - a.games || a.name.localeCompare(b.name);
+    }
+
+    return rivalryWinrate(b) - rivalryWinrate(a) || b.wins - a.wins || b.games - a.games || a.name.localeCompare(b.name);
+  });
+}
+
+function ProfileRivalryList({
+  items,
+  onOpenProfile,
+  sortBy,
+  title
+}: {
+  items: PlayerRivalry[];
+  onOpenProfile: (battleTag: string) => void;
+  sortBy: ProfileRivalrySort;
+  title: string;
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  const sortedItems = sortProfileRivalries(items, sortBy);
+
+  return (
+    <div className="profile-rivalry-card">
+      <h4>{title}</h4>
+      <div className="profile-rivalry-list">
+        {sortedItems.map((rivalry) => (
+          <div className="profile-rivalry-row" key={rivalry.battleTag}>
+            <button
+              className="profile-rivalry-player"
+              type="button"
+              title={rivalry.battleTag}
+              onClick={() => onOpenProfile(rivalry.battleTag)}
+            >
+              {rivalry.name}
+            </button>
+            <span>{formatProfileNumber(rivalry.games)} games</span>
+            <strong>
+              {rivalry.wins}-{rivalry.losses}
+            </strong>
+            <small>{formatProfilePercent(rivalry.winrate)}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProfileRivalries({
+  onOpenProfile,
+  rivalries
+}: {
+  onOpenProfile: (battleTag: string) => void;
+  rivalries?: PlayerRivalries;
+}) {
+  const [selectedMode, setSelectedMode] = React.useState("all");
+
+  React.useEffect(() => {
+    setSelectedMode("all");
+  }, [rivalries]);
+
+  if (
+    !rivalries ||
+    (rivalries.mostPlayed.length === 0 &&
+      rivalries.mostDefeated.length === 0 &&
+      rivalries.bestWinrate.length === 0 &&
+      rivalries.toughest.length === 0 &&
+      (rivalries.teammatesMostPlayed?.length ?? 0) === 0 &&
+      (rivalries.teammatesBestWinrate?.length ?? 0) === 0)
+  ) {
+    return null;
+  }
+
+  const availableModes = rivalries.modes?.filter((mode) => (mode.matchCount ?? 0) > 0) ?? [];
+  const selectedModeData = availableModes.find((mode) => String(mode.gameMode) === selectedMode) ?? null;
+  const activeGroup = selectedModeData ?? rivalries;
+
+  return (
+    <section className="profile-section profile-rivalries-section">
+      <div className="profile-section-heading">
+        <h3>Top rivalries</h3>
+        <div className="profile-rivalry-controls">
+          {availableModes.length > 1 ? (
+            <label className="profile-rivalry-mode-select">
+              <select
+                aria-label="Rivalry mode"
+                value={selectedMode}
+                onChange={(event) => setSelectedMode(event.target.value)}
+              >
+                <option value="all">All Legion modes</option>
+                {availableModes.map((mode) => (
+                  <option key={mode.gameMode} value={mode.gameMode}>
+                    {mode.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown aria-hidden="true" size={15} strokeWidth={1.9} />
+            </label>
+          ) : null}
+          <span>{formatRivalryScope(rivalries, activeGroup)}</span>
+        </div>
+      </div>
+      <div className="profile-rivalries-grid">
+        <ProfileRivalryList
+          title="Played against most"
+          items={activeGroup.mostPlayed}
+          sortBy="games"
+          onOpenProfile={onOpenProfile}
+        />
+        <ProfileRivalryList title="Defeated most" items={activeGroup.mostDefeated} sortBy="wins" onOpenProfile={onOpenProfile} />
+        <ProfileRivalryList
+          title="Best winrate vs"
+          items={activeGroup.bestWinrate}
+          sortBy="winrate"
+          onOpenProfile={onOpenProfile}
+        />
+        <ProfileRivalryList
+          title="Lowest winrate vs"
+          items={activeGroup.toughest}
+          sortBy="lossrate"
+          onOpenProfile={onOpenProfile}
+        />
+        <ProfileRivalryList
+          title="Played with most"
+          items={activeGroup.teammatesMostPlayed ?? []}
+          sortBy="games"
+          onOpenProfile={onOpenProfile}
+        />
+        <ProfileRivalryList
+          title="Best teammate WR"
+          items={activeGroup.teammatesBestWinrate ?? []}
+          sortBy="winrate"
+          onOpenProfile={onOpenProfile}
+        />
+      </div>
+    </section>
+  );
+}
+
+function recentGameResultLabel(result: RecentGame["result"]) {
+  if (result === "win") {
+    return "Win";
+  }
+
+  if (result === "loss") {
+    return "Loss";
+  }
+
+  return "Unknown";
+}
+
+function oppositeRecentGameResult(result: RecentGame["result"]): RecentGame["result"] {
+  if (result === "win") {
+    return "loss";
+  }
+
+  if (result === "loss") {
+    return "win";
+  }
+
+  return "unknown";
+}
+
+function recentGameTeams(game: RecentGame, profile: Pick<PlayerProfilePayload, "battleTag" | "name">) {
+  if (Array.isArray(game.teams) && game.teams.length >= 2) {
+    return game.teams;
+  }
+
+  const profileTeamId = game.profileTeamId ?? 0;
+  const opponentTeamId = profileTeamId === 0 ? 1 : 0;
+  const teams: RecentGameTeam[] = [
+    {
+      id: profileTeamId,
+      result: game.result,
+      players: [
+        {
+          id: -1,
+          battleTag: profile.battleTag,
+          name: profile.name,
+          isProfilePlayer: true
+        },
+        ...game.teammates.map((name, index) => ({
+          id: index,
+          battleTag: null,
+          name
+        }))
+      ]
+    },
+    {
+      id: opponentTeamId,
+      result: oppositeRecentGameResult(game.result),
+      players: game.opponents.map((name, index) => ({
+        id: index,
+        battleTag: null,
+        name
+      }))
+    }
+  ];
+
+  return teams.sort((a, b) => a.id - b.id);
+}
+
+function ProfileRecentTeam({
+  onOpenProfile,
+  team
+}: {
+  onOpenProfile: (battleTag: string) => void;
+  team: RecentGameTeam;
+}) {
+  const players =
+    team.players.length > 0
+      ? team.players
+      : [
+          {
+            id: -1,
+            battleTag: null,
+            name: "Unknown"
+          }
+        ];
+
+  return (
+    <div className="profile-recent-team" data-result={team.result}>
+      {players.map((player, index) =>
+        player.battleTag ? (
+          <button
+            className="profile-recent-player"
+            data-self={player.isProfilePlayer ? "true" : undefined}
+            key={`${player.id}-${player.battleTag}-${index}`}
+            title={player.battleTag}
+            type="button"
+            onClick={() => onOpenProfile(player.battleTag ?? "")}
+          >
+            {player.name}
+          </button>
+        ) : (
+          <span
+            className="profile-recent-player"
+            data-self={player.isProfilePlayer ? "true" : undefined}
+            key={`${player.id}-${player.name}-${index}`}
+            title={player.name}
+          >
+            {player.name}
+          </span>
+        )
+      )}
+    </div>
+  );
+}
+
+function ProfileRecentGames({
+  games,
+  onOpenProfile,
+  onOpenViewer,
+  profile
+}: {
+  games: RecentGame[];
+  onOpenProfile: (battleTag: string) => void;
+  onOpenViewer: (game: RecentGame) => void;
+  profile: Pick<PlayerProfilePayload, "battleTag" | "name">;
+}) {
+  if (games.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="profile-section profile-recent-section">
+      <h3>Recent games</h3>
+      <div className="profile-recent-games">
+        {games.slice(0, 5).map((game) => {
+          const teams = recentGameTeams(game, profile);
+
+          return (
+            <article className="profile-recent-row" data-result={game.result} key={game.id}>
+              <div className="profile-recent-teams">
+                <ProfileRecentTeam team={teams[0]} onOpenProfile={onOpenProfile} />
+                <div className="profile-recent-versus" aria-label="versus">
+                  VS
+                </div>
+                <ProfileRecentTeam team={teams[1]} onOpenProfile={onOpenProfile} />
+              </div>
+              <div className="profile-recent-meta">
+                <strong>{recentGameResultLabel(game.result)}</strong>
+                <span>
+                  {formatTeamSize(game.mode)} {formatGameMode(game.gameMode)}
+                </span>
+                <small>
+                  {formatProfileDate(game.startedAt)} · {game.duration}
+                </small>
+              </div>
+              <button
+                className="profile-recent-viewer-button"
+                type="button"
+                title="Open online viewer"
+                aria-label={`Open online viewer for ${game.matchId}`}
+                onClick={() => onOpenViewer(game)}
+              >
+                <Eye aria-hidden="true" size={22} strokeWidth={1.8} />
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function PlayerProfilePopover({
+  battleTag,
+  onClose,
+  onOpenProfile,
+  onOpenViewer
+}: {
+  battleTag: string | null;
+  onClose: () => void;
+  onOpenProfile: (battleTag: string) => void;
+  onOpenViewer: (game: RecentGame) => void;
+}) {
+  const [profile, setProfile] = React.useState<PlayerProfilePayload | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [selectedSeason, setSelectedSeason] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!battleTag) {
+      setProfile(null);
+      setError(null);
+      setIsLoading(false);
+      setSelectedSeason(null);
+      return undefined;
+    }
+
+    const selectedBattleTag = battleTag;
+    const controller = new AbortController();
+    let isCurrent = true;
+
+    async function loadProfile() {
+      setIsLoading(true);
+      setError(null);
+      setProfile(null);
+
+      try {
+        const params = new URLSearchParams({ battleTag: selectedBattleTag });
+        const response = await fetch(`/api/player-profile?${params.toString()}`, { signal: controller.signal });
+        const data = (await response.json()) as PlayerProfilePayload & { error?: string };
+
+        if (!response.ok) {
+          throw new Error(data.error ?? "Unable to load profile");
+        }
+
+        if (isCurrent) {
+          setProfile(data);
+          setSelectedSeason(data.selectedSeason ?? data.w3c.season ?? data.seasons[0]?.season ?? null);
+        }
+      } catch (requestError) {
+        if (isCurrent && !(requestError instanceof DOMException && requestError.name === "AbortError")) {
+          setError(requestError instanceof Error ? requestError.message : "Unable to load profile");
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
+  }, [battleTag]);
+
+  React.useEffect(() => {
+    if (!battleTag) {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [battleTag, onClose]);
+
+  if (!battleTag) {
+    return null;
+  }
+
+  const activeSeason = profile?.seasons.find((season) => season.season === selectedSeason) ?? profile?.seasons[0] ?? null;
+  const activeLocal = activeSeason?.local ?? profile?.local;
+  const activeModes = activeSeason?.modes ?? profile?.w3c.modes ?? [];
+  const activeCurrent = activeSeason?.current ?? profile?.w3c.current;
+  const activeSeasonNumber = activeSeason?.season ?? profile?.w3c.season ?? null;
+  const current = activeCurrent;
+  const topPercent = formatTopPercent(current?.topPercent);
+  const seasonRange = formatProfileDateRange(activeSeason?.startedAt, activeSeason?.endedAt);
+
+  return (
+    <div className="player-profile-layer" role="presentation" onMouseDown={onClose}>
+      <aside
+        className="player-profile-popover"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Player profile for ${profile?.name ?? battleTag}`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button className="player-profile-close" type="button" onClick={onClose} aria-label="Close player profile">
+          <X aria-hidden="true" size={24} strokeWidth={2.1} />
+        </button>
+
+        {isLoading ? <div className="profile-loading">Loading profile...</div> : null}
+        {error ? <div className="profile-loading profile-loading-error">{error}</div> : null}
+
+        {profile ? (
+          <>
+            <header className="profile-header">
+              <div>
+                <h2>{profile.name}</h2>
+                <p>{profile.battleTag}</p>
+              </div>
+              <div className="profile-header-actions">
+                {profile.seasons.length > 1 ? (
+                  <label className="profile-season-select">
+                    <span>Season</span>
+                    <select
+                      aria-label="Profile season"
+                      value={selectedSeason ?? ""}
+                      onChange={(event) => setSelectedSeason(Number(event.target.value))}
+                    >
+                      {profile.seasons.map((season) => (
+                        <option key={season.season} value={season.season}>
+                          {season.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown aria-hidden="true" size={16} strokeWidth={1.9} />
+                  </label>
+                ) : null}
+                <a href={profile.w3cProfileUrl} target="_blank" rel="noreferrer" aria-label={`${profile.name} on w3champions`}>
+                  W3C
+                  <ExternalLink aria-hidden="true" size={15} strokeWidth={1.9} />
+                </a>
+              </div>
+            </header>
+
+            <div className="profile-stat-grid">
+              <ProfileStat label="W3C MMR" tone="accent" value={formatProfileNumber(current?.mmr)} />
+              <ProfileStat label="W3C Rank" value={current?.rank ? `#${formatProfileNumber(current.rank)}` : "-"} />
+              <ProfileStat label="W3C W/L" value={current ? `${current.wins}-${current.losses}` : "-"} />
+              <ProfileStat label="W3C Winrate" tone="good" value={formatProfilePercent(current?.winrate)} />
+              <ProfileStat label="W3C Games" value={formatProfileNumber(current?.games)} />
+              <ProfileStat label="Avg Value" value={formatProfileNumber(activeLocal?.averageValue)} />
+              <ProfileStat label="Avg Income" value={formatProfileNumber(activeLocal?.averageIncome)} />
+            </div>
+
+            <div className="profile-meta-line">
+              <span>Season {activeSeasonNumber ?? "-"}</span>
+              {seasonRange ? <span>{seasonRange}</span> : null}
+              {topPercent ? <span>{topPercent}</span> : null}
+              <span>Last w3champions game {formatProfileDate(activeLocal?.lastGameAt)}</span>
+            </div>
+
+            <div className="profile-columns">
+              <div>
+                <ProfileModeList modes={activeModes} />
+              </div>
+              <div>
+                <ProfileUnitStrip title="Favorites" items={activeLocal?.favoriteRolls ?? []} />
+                <ProfileUnitStrip title="Opening units" items={activeLocal?.favoriteOpeners ?? []} />
+              </div>
+            </div>
+
+            <ProfileRivalries rivalries={profile.rivalries} onOpenProfile={onOpenProfile} />
+
+            <ProfileRecentGames
+              games={activeLocal?.recentGames ?? []}
+              onOpenProfile={onOpenProfile}
+              onOpenViewer={onOpenViewer}
+              profile={profile}
+            />
+
+            {activeSeason?.fetchError || profile.fetchError ? <p className="profile-warning">{activeSeason?.fetchError ?? profile.fetchError}</p> : null}
+          </>
+        ) : null}
+      </aside>
     </div>
   );
 }
@@ -658,6 +1529,7 @@ function ReplayTable({
   emptyMessage,
   error,
   isLoading,
+  onOpenProfile,
   onOpenViewer,
   onRetry,
   replays
@@ -665,6 +1537,7 @@ function ReplayTable({
   emptyMessage: string;
   error?: string | null;
   isLoading?: boolean;
+  onOpenProfile: (battleTag: string) => void;
   onOpenViewer: (replay: Replay) => void;
   onRetry?: () => void;
   replays: Replay[];
@@ -691,7 +1564,11 @@ function ReplayTable({
         </div>
       ) : null}
       {!isLoading && !error && replays.length === 0 ? <div className="replay-status">{emptyMessage}</div> : null}
-      {!error ? replays.map((replay) => <ReplayRow key={replay.id} replay={replay} onOpenViewer={onOpenViewer} />) : null}
+      {!error
+        ? replays.map((replay) => (
+            <ReplayRow key={replay.id} replay={replay} onOpenProfile={onOpenProfile} onOpenViewer={onOpenViewer} />
+          ))
+        : null}
     </div>
   );
 }
@@ -738,12 +1615,14 @@ function PlayerSearchResults({
   groups,
   isLoading,
   onGroupPageChange,
+  onOpenProfile,
   onOpenViewer,
   query
 }: {
   groups: PlayerSearchGroup[];
   isLoading: boolean;
   onGroupPageChange: (group: PlayerSearchGroup, page: number) => void;
+  onOpenProfile: (battleTag: string) => void;
   onOpenViewer: (replay: Replay) => void;
   query: string;
 }) {
@@ -768,6 +1647,7 @@ function PlayerSearchResults({
           <ReplayTable
             emptyMessage={`No ${formatTeamSize(group.mode)} ${formatGameMode(group.gameMode)} games found for ${query}.`}
             isLoading={isLoading}
+            onOpenProfile={onOpenProfile}
             onOpenViewer={onOpenViewer}
             replays={group.replays}
           />
@@ -796,15 +1676,16 @@ function GamesView() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [viewerSession, setViewerSession] = React.useState<ViewerSession | null>(null);
+  const [profileBattleTag, setProfileBattleTag] = React.useState<string | null>(null);
   const viewerReplayGameIdRef = React.useRef<string | null>(null);
   const lastViewerSeekRef = React.useRef<string | null>(null);
 
-  const openViewer = React.useCallback((replay: Replay) => {
-    const replayGameId = String(replay.id);
+  const openViewerSession = React.useCallback((replayGameId: string, title: string, layer: ViewerSession["layer"]) => {
     const session = {
       replayGameId,
       initialSeekSeconds: 0,
-      title: replay.matchId
+      layer,
+      title
     };
 
     writeViewerUrl(replayGameId, "0", "push");
@@ -812,6 +1693,20 @@ function GamesView() {
     lastViewerSeekRef.current = "0";
     setViewerSession(session);
   }, []);
+
+  const openViewer = React.useCallback(
+    (replay: Replay) => {
+      openViewerSession(String(replay.id), replay.matchId, "page");
+    },
+    [openViewerSession]
+  );
+
+  const openProfileRecentViewer = React.useCallback(
+    (game: RecentGame) => {
+      openViewerSession(String(game.id), game.matchId, "profile");
+    },
+    [openViewerSession]
+  );
 
   const closeViewer = React.useCallback(() => {
     removeViewerUrl();
@@ -1050,6 +1945,7 @@ function GamesView() {
             <ReplayTable
               emptyMessage={`No games found for ${playerQuery}.`}
               error={error}
+              onOpenProfile={setProfileBattleTag}
               onOpenViewer={openViewer}
               onRetry={() => setReloadKey((value) => value + 1)}
               replays={[]}
@@ -1059,6 +1955,7 @@ function GamesView() {
               groups={playerSearchResult.groups}
               isLoading={isLoading}
               onGroupPageChange={goToPlayerGroupPage}
+              onOpenProfile={setProfileBattleTag}
               onOpenViewer={openViewer}
               query={playerSearchResult.query}
             />
@@ -1066,6 +1963,7 @@ function GamesView() {
             <ReplayTable
               emptyMessage={`No games found for ${playerQuery}.`}
               isLoading={isLoading}
+              onOpenProfile={setProfileBattleTag}
               onOpenViewer={openViewer}
               replays={[]}
             />
@@ -1076,6 +1974,7 @@ function GamesView() {
               emptyMessage={formatEmptyGamesMessage(payload?.mode, payload?.gameMode)}
               error={error}
               isLoading={isLoading && !payload}
+              onOpenProfile={setProfileBattleTag}
               onOpenViewer={openViewer}
               onRetry={() => setReloadKey((value) => value + 1)}
               replays={pageItems}
@@ -1090,7 +1989,18 @@ function GamesView() {
           </>
         )}
       </section>
-      <ReplayViewerModal viewer={viewerSession} onClose={closeViewer} onTimeChange={syncViewerTime} />
+      <PlayerProfilePopover
+        battleTag={profileBattleTag}
+        onClose={() => setProfileBattleTag(null)}
+        onOpenProfile={setProfileBattleTag}
+        onOpenViewer={openProfileRecentViewer}
+      />
+      <ReplayViewerModal
+        viewer={viewerSession}
+        onClose={closeViewer}
+        onOpenProfile={setProfileBattleTag}
+        onTimeChange={syncViewerTime}
+      />
     </>
   );
 }

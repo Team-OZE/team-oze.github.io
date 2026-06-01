@@ -1,0 +1,22 @@
+{
+  "name": "Team OZE",
+  "short_name": "Team OZE",
+  "description": "Legion TD games, events, community, and W3Champions resources from Team OZE.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#0a1009",
+  "background_color": "#0a1009",
+  "display": "standalone"
+}

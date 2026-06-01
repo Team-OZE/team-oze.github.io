@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a1009" />
     <title>Legion TD Tactical Map</title>
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest" />
     <script>
       (() => {
         let isTopLevel = false;
@@ -30,7 +37,7 @@
         window.location.replace(target);
       })();
     </script>
-    <link rel="stylesheet" href="src/styles.css?v=227" />
+    <link rel="stylesheet" href="src/styles.css?v=233" />
   </head>
   <body>
     <main class="app">
@@ -49,7 +56,7 @@
         <output id="replay-duration" for="replay-time">00:00</output>
         <div id="load-state-controls" class="load-state-controls" aria-label="Warcraft load state" hidden>
           <select id="load-state-player" aria-label="Player army"></select>
-          <button id="load-state-download" type="button" title="Download Benchmark.pld">Save</button>
+          <button id="load-state-download" type="button" title="Download Benchmark.pld" hidden>Save</button>
         </div>
       </div>
       <header class="topbar">
@@ -101,12 +108,13 @@
           </section>
         </div>
         <aside id="player-events-popover" class="player-events-popover" aria-label="Player event history" hidden></aside>
+        <aside id="player-profile-popover" class="player-profile-popover" aria-label="Player profile" hidden></aside>
         <canvas id="map-minimap" class="map-minimap" aria-label="Map minimap"></canvas>
         <aside id="selection-card" class="selection-card" hidden></aside>
       </section>
       <aside id="endgame-overlay" class="endgame-overlay" aria-label="Game result" hidden></aside>
     </main>
 
-    <script type="module" src="src/app.js?v=267"></script>
+    <script type="module" src="src/app.js?v=282"></script>
   </body>
 </html>

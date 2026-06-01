@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/w3c-player-stats",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

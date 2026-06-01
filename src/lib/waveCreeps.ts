@@ -5,9 +5,15 @@ export type WaveCreep = {
   unitType: string;
   unitName: string;
   iconPath: string;
+  count: number;
   description: string | null;
   stats: UnitTooltipStats;
 };
+
+const DEFAULT_WAVE_CREEP_COUNT = 100;
+const BOSS_WAVE_CREEP_COUNT = 12;
+const BOSS_WAVE_LEVELS = new Set([10, 20, 30]);
+const WAVE_CREEP_COUNT_OVERRIDES = new Map([[35, 2]]);
 
 const waveCreeps: WaveCreep[] = [
   waveCreep(1, "h002", "Crab", 100, "7-9", 0.9, 90, 235, "pierce", "none"),
@@ -71,6 +77,7 @@ function waveCreep(
     unitType,
     unitName,
     iconPath: `/_replay-viewer/assets/wave-creeps/${unitType}.png`,
+    count: WAVE_CREEP_COUNT_OVERRIDES.get(level) ?? (BOSS_WAVE_LEVELS.has(level) ? BOSS_WAVE_CREEP_COUNT : DEFAULT_WAVE_CREEP_COUNT),
     description,
     stats: {
       damage,

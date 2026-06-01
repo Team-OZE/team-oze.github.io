@@ -1,6 +1,10 @@
 import type { RowDataPacket } from "mysql2";
 import { getDatabasePool } from "./database";
-import { getPlayerEloMap, normalizeBattleTag } from "./playerElo";
+import {
+  cachedW3ChampionsMmrForMode,
+  getCachedW3ChampionsMmrByModeMap,
+  w3ChampionsGameModeForTeamSize
+} from "./playerElo";
 import {
   type GameModeOption,
   type GamesPage,
@@ -204,6 +208,7 @@ async function loadPlayerSearchMatchPage(
 ) {
   if (!pool || !filters.mode || !filters.gameMode) return [];
 
+  const gameModeFilter = gameModeWhere(filters.gameMode);
   const [matchRows] = await pool.query<MatchRow[]>(
     `SELECT
        m.id,
@@ -217,10 +222,10 @@ async function loadPlayerSearchMatchPage(
      FROM ${playerSearchMatchesFrom()}
      ${gameInitJoin}
      WHERE ${playerSearchModeExpression} = ?
-       AND ${gameModeExpression} = ?
+       AND ${gameModeFilter.sql}
      ORDER BY m.started_at DESC, m.id DESC
      LIMIT ? OFFSET ?`,
-    [...playerSearchParams(filters.player), filters.mode, filters.gameMode, filters.pageSize, filters.offset]
+    [...playerSearchParams(filters.player), filters.mode, ...gameModeFilter.params, filters.pageSize, filters.offset]
   );
 
   return matchRows;
@@ -307,16 +312,25 @@ async function loadPlayersForMatches(pool: Awaited<ReturnType<typeof getDatabase
      ORDER BY match_id, player_id`,
     matchIds
   );
-  const playerEloByBattleTag = await getPlayerEloMap();
+  const playerMmrByBattleTag = await getCachedW3ChampionsMmrByModeMap(playerRows.map((row) => row.battleTag));
+  const playerCountsByMatch = new Map<number, number>();
+
+  for (const row of playerRows) {
+    const matchId = Number(row.matchId);
+    playerCountsByMatch.set(matchId, (playerCountsByMatch.get(matchId) ?? 0) + 1);
+  }
 
   for (const row of playerRows) {
     const matchId = Number(row.matchId);
     const players = playersByMatch.get(matchId) ?? [];
+    const teamSize = Math.ceil((playerCountsByMatch.get(matchId) ?? 0) / 2);
+    const w3cGameMode = w3ChampionsGameModeForTeamSize(teamSize);
+
     players.push({
       id: Number(row.playerId),
       battleTag: row.battleTag,
       name: playerName(row.battleTag),
-      elo: playerEloByBattleTag.get(normalizeBattleTag(row.battleTag)) ?? null
+      elo: cachedW3ChampionsMmrForMode(playerMmrByBattleTag, row.battleTag, w3cGameMode)
     });
     playersByMatch.set(matchId, players);
   }
@@ -334,14 +348,27 @@ function matchFilter(filters: { mode: string | null; gameMode: string | null }) 
   }
 
   if (filters.gameMode) {
-    clauses.push(`${gameModeExpression} = ?`);
-    params.push(filters.gameMode);
+    const gameModeFilter = gameModeWhere(filters.gameMode);
+    clauses.push(gameModeFilter.sql);
+    params.push(...gameModeFilter.params);
   }
 
   return {
     where: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "",
     params
   };
+}
+
+function gameModeWhere(gameMode: string | null) {
+  if (!gameMode) {
+    return { sql: "1 = 1", params: [] as string[] };
+  }
+
+  if (gameMode === "Unknown") {
+    return { sql: "m.gamemode IS NULL", params: [] as string[] };
+  }
+
+  return { sql: "m.gamemode = ?", params: [gameMode] };
 }
 
 function normalizePlayerSearch(value: string | null | undefined) {
