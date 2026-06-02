@@ -82,7 +82,7 @@ const TEAM_KING_CENTER_OFFSET_CELLS = 10.5;
 const TEAM_KING_ROSTER_GAP_PX = 4;
 const TEAM_CENTER_GROUP_GAP_PX = 14;
 const TEAM_CENTER_VERTICAL_PADDING_PX = 10;
-const TEAM_CENTER_COLUMN_MARGIN_PX = 8;
+const TEAM_CENTER_COLUMN_MARGIN_PX = 4;
 const TEAM_CONTENT_FRAME_PADDING_PX = 6;
 const TEAM_SEND_PANEL_GAP_PX = 6;
 const TEAM_KING_HUD_GAP_PX = 3;
@@ -120,6 +120,7 @@ const PLAYER_CORNER_CARD_GREY_THRESHOLD = 0.9;
 const PLAYER_CORNER_CARD_PIN_PADDING_PX = 4;
 const PLAYER_CORNER_CARD_WIDTH_PX = 216;
 const PLAYER_CORNER_CARD_MAX_HEIGHT_PX = 360;
+const PLAYER_CORNER_CARD_MAX_ZOOM_SCALE = 1.42;
 const PLAYER_CORNER_CARD_MIN_VISIBLE_WIDTH_PX = 112;
 const PLAYER_CORNER_CARD_MIN_VISIBLE_HEIGHT_PX = 96;
 const PLAYER_CORNER_CARD_BASE_CONTENT_HEIGHT_PX = 326;
@@ -3579,26 +3580,38 @@ function updateTeamSendOverlays() {
     const playerGroups = activeTeamPlayerSendGroups(teamIndex);
     if (!playerGroups.length) {
       panel.hidden = true;
+      delete panel.dataset.senderCount;
       panel.replaceChildren();
       continue;
     }
 
     panel.hidden = false;
+    panel.dataset.senderCount = String(playerGroups.length);
     panel.replaceChildren(
       ...playerGroups.map((playerGroup) => {
         const section = document.createElement("section");
         section.className = "team-overlay__send-player";
+        section.style.setProperty("--player-name-color", playerSlotColor(playerGroup.playerId));
 
         const playerName = document.createElement("div");
         playerName.className = "team-overlay__send-player-name";
         playerName.textContent = playerGroup.playerName;
-        playerName.style.setProperty("--player-name-color", playerSlotColor(playerGroup.playerId));
         section.appendChild(playerName);
 
         for (const group of playerGroup.groups) {
           const row = document.createElement("div");
           row.className = "team-overlay__send-row";
-          row.textContent = `Sent ${group.unitName}: ${compactNumber(group.count)}`;
+          row.title = `Sent ${group.unitName}: ${compactNumber(group.count)}`;
+
+          const unit = document.createElement("span");
+          unit.className = "team-overlay__send-unit";
+          unit.textContent = group.unitName;
+
+          const count = document.createElement("span");
+          count.className = "team-overlay__send-count";
+          count.textContent = `x${compactNumber(group.count)}`;
+
+          row.append(unit, count);
           section.appendChild(row);
         }
 
@@ -5736,14 +5749,23 @@ function positionTeamOverlay() {
   teamOverlay.dataset.hidden = visible ? "false" : "true";
   if (!visible) return;
 
+  const sendPanels = [0, 1].map((index) => ensureTeamSendsPanel(index));
+  const activeSenderCount = sendPanels.reduce((max, panel) => {
+    return Math.max(max, panel && !panel.hidden ? Number(panel.dataset.senderCount || 0) : 0);
+  }, 0);
   const maxOverlayWidth = Math.min(282, Math.max(180, rect.width - 24));
   const minOverlayWidth = Math.min(222, maxOverlayWidth);
   const overlayWidth = clamp(laneWidth + 78, minOverlayWidth, maxOverlayWidth);
   const widthScale = clamp((laneWidth - TEAM_CENTER_COLUMN_MARGIN_PX * 2) / overlayWidth, 0.25, 1);
+  const laneBoundedSendWidth = Math.max(0, Math.min(rect.width - 24, laneWidth - TEAM_CENTER_COLUMN_MARGIN_PX * 2));
+  const visibleSendPanelWidth =
+    activeSenderCount >= 2 && laneBoundedSendWidth > 0 ? laneBoundedSendWidth : Math.min(overlayWidth, laneBoundedSendWidth || overlayWidth);
   teamOverlay.style.left = `${screenX}px`;
   teamOverlay.style.top = `${visibleTop}px`;
   teamOverlay.style.width = `${overlayWidth}px`;
   teamOverlay.style.height = `${overlayHeight}px`;
+  teamOverlay.style.setProperty("--team-send-panel-width", `${visibleSendPanelWidth}px`);
+  teamOverlay.style.setProperty("--team-send-columns", activeSenderCount >= 2 ? "2" : "1");
 
   const sections = [...teamOverlay.querySelectorAll(".team-overlay__side")].slice(0, 2);
   const frames = sections.map((_, index) => ensureTeamContentFrame(index));
@@ -5759,7 +5781,6 @@ function positionTeamOverlay() {
     const kingHeight = kingSizes[index] ? TEAM_KING_ROSTER_GAP_PX + kingHudOuterHeight(token) : 0;
     return section.offsetHeight + kingHeight + TEAM_CONTENT_FRAME_PADDING_PX * 2;
   });
-  const sendPanels = sections.map((_, index) => ensureTeamSendsPanel(index));
   const sendPanelHeights = sendPanels.map((panel) => (panel && !panel.hidden ? panel.offsetHeight : 0));
   const topSendSlotHeight = sendPanelHeights[0] ? sendPanelHeights[0] + TEAM_SEND_PANEL_GAP_PX : 0;
   const bottomSendSlotHeight = sendPanelHeights[1] ? sendPanelHeights[1] + TEAM_SEND_PANEL_GAP_PX : 0;
@@ -5778,6 +5799,7 @@ function positionTeamOverlay() {
   let cursor = stackTop + topSendSlotHeight;
   const metrics = { visible, cellSize, scale: contentScale, screenX, screenTop: visibleTop };
   teamOverlay.style.setProperty("--team-content-scale", String(contentScale));
+  teamOverlay.style.setProperty("--team-send-panel-width", `${visibleSendPanelWidth / Math.max(contentScale, 0.01)}px`);
 
   for (const [index, section] of sections.entries()) {
     const frame = frames[index];
@@ -5854,7 +5876,7 @@ function playerCornerGreyAnchorX(component, alignX, y0, widthCells, heightCells)
   const searchMin = Math.max(component.minX - PLAYER_CORNER_CARD_SIDE_SEARCH_CELLS, PLAY_BOUNDS.x + widthCells);
 
   for (let x = component.maxX; x >= searchMin; x -= 1) {
-    if (isStableGreyPanelArea(x - widthCells, y0, widthCells, heightCells, alignX)) return x + 0.85;
+    if (isStableGreyPanelArea(x - widthCells, y0, widthCells, heightCells, alignX)) return x - 0.15;
   }
 
   return component.minX - 0.35;
@@ -5956,6 +5978,8 @@ function positionPlayerCornerPanels() {
   const rect = board.getBoundingClientRect();
   const current = frame();
   const cellSize = rect.width / current.width;
+  const desiredHudScale = 1 + clamp((state.zoom - MIN_ZOOM) / (DEFAULT_ZOOM - MIN_ZOOM), 0, 1) * (PLAYER_CORNER_CARD_MAX_ZOOM_SCALE - 1);
+  const layouts = [];
 
   for (const card of playerCornerOverlay.querySelectorAll(".player-corner-card[data-player-id]")) {
     const anchorX = Number(card.dataset.anchorX);
@@ -5985,8 +6009,43 @@ function positionPlayerCornerPanels() {
     const areaHeight = Math.max(0, areaBottom - areaTop);
     const availableWidth = Math.max(0, areaWidth - PLAYER_CORNER_CARD_PIN_PADDING_PX * 2);
     const availableHeight = Math.max(0, areaHeight - PLAYER_CORNER_CARD_PIN_PADDING_PX * 2);
-    const widthPx = Math.min(PLAYER_CORNER_CARD_WIDTH_PX, availableWidth);
-    const heightPx = Math.min(PLAYER_CORNER_CARD_MAX_HEIGHT_PX, availableHeight);
+    const fitScale = Math.min(
+      desiredHudScale,
+      availableWidth / PLAYER_CORNER_CARD_WIDTH_PX,
+      availableHeight / PLAYER_CORNER_CARD_MAX_HEIGHT_PX
+    );
+
+    layouts.push({
+      card,
+      alignY,
+      areaLeft,
+      areaTop,
+      areaBottom,
+      availableWidth,
+      availableHeight,
+      fitScale,
+    });
+  }
+
+  const visibleFitScales = layouts
+    .filter(({ availableWidth, availableHeight }) => {
+      return availableWidth >= PLAYER_CORNER_CARD_MIN_VISIBLE_WIDTH_PX && availableHeight >= PLAYER_CORNER_CARD_MIN_VISIBLE_HEIGHT_PX;
+    })
+    .map(({ fitScale }) => fitScale);
+  const hudScale = visibleFitScales.length ? clamp(Math.min(desiredHudScale, ...visibleFitScales), 1, desiredHudScale) : 1;
+  const scaledWidthTarget = PLAYER_CORNER_CARD_WIDTH_PX * hudScale;
+  const scaledHeightTarget = PLAYER_CORNER_CARD_MAX_HEIGHT_PX * hudScale;
+  const scaledBaseContentHeight = PLAYER_CORNER_CARD_BASE_CONTENT_HEIGHT_PX * hudScale;
+  const scaledFontSize = Math.round(11 * hudScale * 10) / 10;
+  const scaledHeaderFontSize = Math.round(13 * hudScale * 10) / 10;
+  const scaledGap = Math.max(2, Math.round(5 * hudScale));
+  const scaledRollGap = Math.max(2, Math.round(PLAYER_CORNER_ROLL_ICON_GAP_PX * hudScale));
+  const zoomBoostRatio = clamp((state.zoom - MIN_ZOOM) / (DEFAULT_ZOOM - MIN_ZOOM), 0, 1);
+
+  for (const layout of layouts) {
+    const { card, alignY, areaLeft, areaTop, areaBottom, availableWidth, availableHeight } = layout;
+    const widthPx = Math.min(scaledWidthTarget, availableWidth);
+    const heightPx = Math.min(scaledHeightTarget, availableHeight);
     const left = areaLeft + PLAYER_CORNER_CARD_PIN_PADDING_PX + Math.max(0, availableWidth - widthPx) / 2;
     const top =
       alignY === "bottom"
@@ -5999,29 +6058,28 @@ function positionPlayerCornerPanels() {
     }
 
     card.dataset.hidden = "false";
-    card.dataset.tight = heightPx < PLAYER_CORNER_CARD_BASE_CONTENT_HEIGHT_PX * 0.72 ? "true" : "false";
-    const contentScale = clamp(
-      Math.min(widthPx / PLAYER_CORNER_CARD_WIDTH_PX, heightPx / PLAYER_CORNER_CARD_BASE_CONTENT_HEIGHT_PX),
+    card.dataset.tight = heightPx < scaledBaseContentHeight * 0.72 ? "true" : "false";
+    const layoutScale = clamp(
+      Math.min(widthPx / scaledWidthTarget, heightPx / scaledBaseContentHeight),
       0.74,
       1
     );
-    const zoomBoostRatio = clamp((state.zoom - MIN_ZOOM) / (DEFAULT_ZOOM - MIN_ZOOM), 0, 1);
     const zoomIconSizePx = PLAYER_CORNER_ROLL_ICON_MIN_PX + zoomBoostRatio * PLAYER_CORNER_ROLL_ICON_ZOOM_BOOST_PX;
-    const maxRollIconForWidth = Math.floor((widthPx - PLAYER_CORNER_ROLL_ICON_GAP_PX * 5) / 6);
-    const rollIconMaxPx = Math.max(18, Math.min(PLAYER_CORNER_ROLL_ICON_MAX_PX, maxRollIconForWidth));
+    const maxRollIconForWidth = Math.floor((widthPx - scaledRollGap * 5) / 6);
+    const rollIconMaxPx = Math.max(18, Math.min(PLAYER_CORNER_ROLL_ICON_MAX_PX * hudScale, maxRollIconForWidth));
     const rollIconMinPx = Math.min(PLAYER_CORNER_ROLL_ICON_MIN_PX, rollIconMaxPx);
     const rollIconSizePx = Math.round(
       clamp(
-        Math.max(cellSize * PLAYER_CORNER_ROLL_ICON_CELL_SCALE, zoomIconSizePx) * contentScale,
+        Math.max(cellSize * PLAYER_CORNER_ROLL_ICON_CELL_SCALE, zoomIconSizePx) * hudScale * layoutScale,
         rollIconMinPx,
         rollIconMaxPx
       )
     );
     card.style.setProperty("--player-corner-roll-icon-size", `${rollIconSizePx}px`);
-    card.style.setProperty("--player-corner-font-size", `${Math.round(11 * contentScale * 10) / 10}px`);
-    card.style.setProperty("--player-corner-header-font-size", `${Math.round(13 * contentScale * 10) / 10}px`);
-    card.style.setProperty("--player-corner-gap", `${Math.max(2, Math.round(5 * contentScale))}px`);
-    card.style.setProperty("--player-corner-roll-gap", `${Math.max(2, Math.round(PLAYER_CORNER_ROLL_ICON_GAP_PX * contentScale))}px`);
+    card.style.setProperty("--player-corner-font-size", `${scaledFontSize}px`);
+    card.style.setProperty("--player-corner-header-font-size", `${scaledHeaderFontSize}px`);
+    card.style.setProperty("--player-corner-gap", `${scaledGap}px`);
+    card.style.setProperty("--player-corner-roll-gap", `${scaledRollGap}px`);
     card.style.width = `${widthPx}px`;
     card.style.height = `${heightPx}px`;
     card.style.maxHeight = `${heightPx}px`;
