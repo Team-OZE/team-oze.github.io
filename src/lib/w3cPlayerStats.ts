@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2";
 import type { Pool } from "mysql2/promise";
-import { getDatabasePool } from "./database";
+import { getDatabasePool, getW3cStatsDatabasePool } from "./database";
 import { iconPathForUnit } from "./unitIcons";
 import { displayNameForUnit } from "./unitOverrides";
 import { normalizeBattleTag } from "./playerElo";
@@ -230,6 +230,18 @@ type ResolveBattleTagRow = RowDataPacket & {
 
 type RefreshCandidateRow = RowDataPacket & {
   battleTag: string;
+  lastGameAt: string | null;
+};
+
+type RefreshCandidateCacheRow = RowDataPacket & {
+  normalizedBattleTag: string;
+  cachedAt: string | null;
+  profilePayloadJson: string | null;
+};
+
+type RefreshCandidateSeasonCountRow = RowDataPacket & {
+  normalizedBattleTag: string;
+  seasonCount: number | string;
 };
 
 type SummaryRow = RowDataPacket & {
@@ -374,16 +386,18 @@ export async function getPlayerProfile(
   battleTagInput: string,
   options: { allowRefresh?: boolean; forceRefresh?: boolean; maxAgeMs?: number } = {}
 ): Promise<PlayerProfilePayload> {
-  const pool = await getDatabasePool();
+  const [pool, statsPool] = await Promise.all([getDatabasePool(), getW3cStatsDatabasePool()]);
 
   if (!pool) {
     throw new Error("Replay database is not configured or does not contain the replay tables");
   }
 
-  await ensureW3cPlayerStatsTable(pool);
+  if (statsPool) {
+    await ensureW3cPlayerStatsTable(statsPool);
+  }
 
   const battleTag = await resolvePlayerBattleTag(pool, battleTagInput);
-  const cached = await loadCachedProfile(pool, battleTag);
+  const cached = statsPool ? await loadCachedProfile(statsPool, battleTag) : null;
   const maxAgeMs = options.maxAgeMs ?? profileFreshMs;
 
   if (!options.allowRefresh) {
@@ -391,18 +405,26 @@ export async function getPlayerProfile(
       return withPlayerRivalries(pool, { ...cached, cacheStatus: isFresh(cached.refreshedAt, maxAgeMs) ? "hit" : "stale" });
     }
 
-    return buildDatabaseOnlyProfile(pool, battleTag);
+    return buildDatabaseOnlyProfile(pool, statsPool, battleTag);
   }
 
   if (!options.forceRefresh && cached && isFresh(cached.refreshedAt, maxAgeMs)) {
     return withPlayerRivalries(pool, { ...cached, cacheStatus: "hit" });
   }
 
-  return refreshPlayerProfile(pool, battleTag, cached ? "stale" : "refreshed");
+  if (!statsPool) {
+    throw new Error("W3C stats database is not configured. Set W3C_STATS_* env vars for profile refresh/cache storage.");
+  }
+
+  return refreshPlayerProfile(pool, statsPool, battleTag, cached ? "stale" : "refreshed");
 }
 
-async function buildDatabaseOnlyProfile(pool: Pool, battleTag: string): Promise<PlayerProfilePayload> {
-  const cachedSeasonProfiles = await loadCachedSeasonProfiles(pool, battleTag);
+async function buildDatabaseOnlyProfile(
+  pool: Pool,
+  statsPool: Pool | null,
+  battleTag: string
+): Promise<PlayerProfilePayload> {
+  const cachedSeasonProfiles = statsPool ? await loadCachedSeasonProfiles(statsPool, battleTag) : new Map<number, PlayerProfileSeason>();
   const seasons = [...cachedSeasonProfiles.values()].sort((a, b) => b.season - a.season);
   const activeSeason = seasons[0] ?? null;
   const local = activeSeason?.local ?? (await loadLocalPlayerStats(pool, battleTag));
@@ -443,20 +465,24 @@ async function buildDatabaseOnlyProfile(pool: Pool, battleTag: string): Promise<
 }
 
 export async function refreshW3cPlayerStats(limit = cronDefaultLimit) {
-  const pool = await getDatabasePool();
+  const [pool, statsPool] = await Promise.all([getDatabasePool(), getW3cStatsDatabasePool()]);
 
   if (!pool) {
     throw new Error("Replay database is not configured or does not contain the replay tables");
   }
 
-  await ensureW3cPlayerStatsTable(pool);
+  if (!statsPool) {
+    throw new Error("W3C stats database is not configured. Set W3C_STATS_* env vars before running the refresh interval.");
+  }
 
-  const battleTags = await loadRefreshCandidates(pool, normalizeLimit(limit));
+  await ensureW3cPlayerStatsTable(statsPool);
+
+  const battleTags = await loadRefreshCandidates(pool, statsPool, normalizeLimit(limit));
   const results: Array<{ battleTag: string; ok: boolean; error?: string }> = [];
 
   for (const battleTag of battleTags) {
     try {
-      await refreshPlayerProfile(pool, battleTag, "refreshed");
+      await refreshPlayerProfile(pool, statsPool, battleTag, "refreshed");
       results.push({ battleTag, ok: true });
     } catch (error) {
       results.push({
@@ -507,7 +533,8 @@ async function ensureW3cPlayerStatsTable(pool: Pool) {
           PRIMARY KEY (battle_tag),
           UNIQUE KEY idx_w3c_player_stats_normalized (normalized_battle_tag),
           KEY idx_w3c_player_stats_fetched_at (fetched_at),
-          KEY idx_w3c_player_stats_local_last_game_at (local_last_game_at)
+          KEY idx_w3c_player_stats_local_last_game_at (local_last_game_at),
+          KEY idx_w3c_player_stats_4v4_mmr_normalized (legion_4v4_mmr, normalized_battle_tag)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
       )
       .then(() =>
@@ -598,10 +625,15 @@ async function loadCachedSeasonProfiles(pool: Pool, battleTag: string) {
   return seasons;
 }
 
-async function refreshPlayerProfile(pool: Pool, battleTag: string, cacheStatus: "refreshed" | "stale") {
+async function refreshPlayerProfile(
+  pool: Pool,
+  statsPool: Pool,
+  battleTag: string,
+  cacheStatus: "refreshed" | "stale"
+) {
   const [w3cData, cachedSeasonProfiles] = await Promise.all([
     loadW3ChampionsData(battleTag),
-    loadCachedSeasonProfiles(pool, battleTag)
+    loadCachedSeasonProfiles(statsPool, battleTag)
   ]);
   const canonicalBattleTag = w3cData.profile?.battleTag || battleTag;
   const name = w3cData.profile?.name || playerName(canonicalBattleTag);
@@ -646,7 +678,7 @@ async function refreshPlayerProfile(pool: Pool, battleTag: string, cacheStatus: 
   };
   const profile = await withPlayerRivalries(pool, profileWithoutRivalries);
 
-  await saveProfile(pool, profile, {
+  await saveProfile(statsPool, profile, {
     rawProfile: w3cData.profile,
     rawSeasons: seasonResult.rawSeasons
   });
@@ -1744,47 +1776,109 @@ function hasMeaningfulRelationshipSample(rivalry: PlayerRivalry, maxGames: numbe
   return maxGames <= 0 || games >= Math.ceil(maxGames * 0.25);
 }
 
-async function loadRefreshCandidates(pool: Pool, limit: number) {
+async function loadRefreshCandidates(pool: Pool, statsPool: Pool, limit: number) {
+  const scanLimit = refreshCandidateScanLimit(limit);
   const [rows] = await pool.query<RefreshCandidateRow[]>(
-    `SELECT battleTag
-     FROM (
-       SELECT
-         p.battle_tag AS battleTag,
-         MAX(m.started_at) AS last_game_at,
-         MIN(stats.fetched_at) AS cached_at,
-         MAX(
-           CASE
-             WHEN stats.profile_payload_json IS NULL THEN 1
-             WHEN JSON_VALID(stats.profile_payload_json) = 0 THEN 1
-             WHEN COALESCE(JSON_UNQUOTE(JSON_EXTRACT(stats.profile_payload_json, '$.rivalries.source')), '') <> 'w3champions' THEN 1
-             WHEN JSON_EXTRACT(stats.profile_payload_json, '$.rivalries.matchCount') IS NULL THEN 1
-             ELSE 0
-           END
-         ) AS needs_w3c_rivalries,
-         COALESCE(MAX(season_stats.season_count), 0) AS season_rows
-       FROM players p
-       INNER JOIN matches m ON m.id = p.match_id
-       LEFT JOIN w3c_player_stats stats ON stats.normalized_battle_tag = LOWER(p.battle_tag)
-       LEFT JOIN (
-         SELECT normalized_battle_tag, COUNT(*) AS season_count
-         FROM w3c_player_season_stats
-         GROUP BY normalized_battle_tag
-       ) season_stats ON season_stats.normalized_battle_tag = LOWER(p.battle_tag)
-       WHERE p.battle_tag <> ''
-         AND p.battle_tag <> 'FLO'
-       GROUP BY p.battle_tag
-     ) refresh_candidates
-     ORDER BY needs_w3c_rivalries DESC,
-       CASE WHEN needs_w3c_rivalries = 1 THEN last_game_at END DESC,
-       (cached_at IS NOT NULL AND season_rows = 0) DESC,
-       cached_at IS NULL DESC,
-       cached_at ASC,
-       last_game_at DESC
+    `SELECT
+       p.battle_tag AS battleTag,
+       DATE_FORMAT(MAX(m.started_at), '%Y-%m-%d %H:%i:%s') AS lastGameAt
+     FROM players p
+     INNER JOIN matches m ON m.id = p.match_id
+     WHERE p.battle_tag <> ''
+       AND p.battle_tag <> 'FLO'
+     GROUP BY p.battle_tag
+     ORDER BY lastGameAt DESC
      LIMIT ?`,
-    [limit]
+    [scanLimit]
   );
 
-  return rows.map((row) => row.battleTag);
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const normalizedBattleTags = [...new Set(rows.map((row) => normalizeBattleTag(row.battleTag)).filter(Boolean))];
+
+  if (normalizedBattleTags.length === 0) {
+    return rows.slice(0, limit).map((row) => row.battleTag);
+  }
+
+  const placeholders = normalizedBattleTags.map(() => "?").join(", ");
+  const [cacheRows, seasonRows] = await Promise.all([
+    statsPool.query<RefreshCandidateCacheRow[]>(
+      `SELECT
+         normalized_battle_tag AS normalizedBattleTag,
+         DATE_FORMAT(fetched_at, '%Y-%m-%d %H:%i:%s') AS cachedAt,
+         profile_payload_json AS profilePayloadJson
+       FROM w3c_player_stats
+       WHERE normalized_battle_tag IN (${placeholders})`,
+      normalizedBattleTags
+    ),
+    statsPool.query<RefreshCandidateSeasonCountRow[]>(
+      `SELECT normalized_battle_tag AS normalizedBattleTag, COUNT(*) AS seasonCount
+       FROM w3c_player_season_stats
+       WHERE normalized_battle_tag IN (${placeholders})
+       GROUP BY normalized_battle_tag`,
+      normalizedBattleTags
+    )
+  ]);
+  const cacheByBattleTag = new Map(cacheRows[0].map((row) => [normalizeBattleTag(row.normalizedBattleTag), row]));
+  const seasonCountByBattleTag = new Map(
+    seasonRows[0].map((row) => [normalizeBattleTag(row.normalizedBattleTag), Number(row.seasonCount ?? 0)])
+  );
+
+  return rows
+    .map((row) => {
+      const normalizedBattleTag = normalizeBattleTag(row.battleTag);
+      const cached = cacheByBattleTag.get(normalizedBattleTag);
+      const cachedAt = cached?.cachedAt ?? null;
+      const seasonRows = seasonCountByBattleTag.get(normalizedBattleTag) ?? 0;
+
+      return {
+        battleTag: row.battleTag,
+        lastGameAt: row.lastGameAt,
+        cachedAt,
+        cachedAtTime: mysqlDateTimeValue(cachedAt, Number.POSITIVE_INFINITY),
+        lastGameAtTime: mysqlDateTimeValue(row.lastGameAt, 0),
+        needsW3cRivalries: profileNeedsW3cRivalries(cached?.profilePayloadJson),
+        seasonRows
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(b.needsW3cRivalries) - Number(a.needsW3cRivalries) ||
+        (b.needsW3cRivalries ? b.lastGameAtTime : 0) - (a.needsW3cRivalries ? a.lastGameAtTime : 0) ||
+        Number(Boolean(b.cachedAt) && b.seasonRows === 0) - Number(Boolean(a.cachedAt) && a.seasonRows === 0) ||
+        Number(!b.cachedAt) - Number(!a.cachedAt) ||
+        a.cachedAtTime - b.cachedAtTime ||
+        b.lastGameAtTime - a.lastGameAtTime
+    )
+    .slice(0, limit)
+    .map((row) => row.battleTag);
+}
+
+function refreshCandidateScanLimit(limit: number) {
+  const configured = Number(process.env.W3C_PLAYER_STATS_CANDIDATE_SCAN_LIMIT);
+
+  if (Number.isFinite(configured) && configured > 0) {
+    return Math.max(limit, Math.min(2000, Math.floor(configured)));
+  }
+
+  return Math.max(limit, Math.min(1000, limit * 12));
+}
+
+function profileNeedsW3cRivalries(profilePayloadJson: string | null | undefined) {
+  const profile = parseJson<PlayerProfilePayload>(profilePayloadJson);
+
+  return profile?.rivalries?.source !== "w3champions" || typeof profile.rivalries.matchCount !== "number";
+}
+
+function mysqlDateTimeValue(value: string | null | undefined, fallback: number) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Date.parse(`${value.replace(" ", "T")}Z`);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 async function saveProfile(

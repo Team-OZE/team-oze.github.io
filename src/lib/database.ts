@@ -4,10 +4,16 @@ import { createConnection, createPool, type Pool, type PoolOptions } from "mysql
 const replayTables = ["matches", "players", "actions", "records_game_init", "records_unit_build", "data_units", "data_heroes"];
 
 let poolPromise: Promise<Pool | null> | null = null;
+let w3cStatsPoolPromise: Promise<Pool | null> | null = null;
 
 export async function getDatabasePool() {
   poolPromise ??= createDatabasePool();
   return poolPromise;
+}
+
+export async function getW3cStatsDatabasePool() {
+  w3cStatsPoolPromise ??= createW3cStatsDatabasePool();
+  return w3cStatsPoolPromise;
 }
 
 async function createDatabasePool() {
@@ -17,6 +23,24 @@ async function createDatabasePool() {
     return null;
   }
 
+  return createConfiguredPool(config);
+}
+
+async function createW3cStatsDatabasePool() {
+  const config = resolveW3cStatsDatabaseConfig();
+
+  if (config) {
+    return createConfiguredPool(config);
+  }
+
+  if (truthyEnv(process.env.W3C_STATS_USE_REPLAY_DATABASE)) {
+    return getDatabasePool();
+  }
+
+  return null;
+}
+
+function createConfiguredPool(config: PoolOptions) {
   return createPool({
     ...config,
     connectionLimit: 6,
@@ -70,6 +94,16 @@ function explicitConfig(): PoolOptions | null {
 function sslConfig(): Partial<PoolOptions> {
   const sslMode = process.env.DB_SSL ?? process.env.MYSQL_SSL ?? process.env.MARIADB_SSL;
 
+  return sslConfigFromValue(sslMode);
+}
+
+function w3cStatsSslConfig(): Partial<PoolOptions> {
+  const sslMode = process.env.W3C_STATS_DB_SSL ?? process.env.W3C_STATS_MYSQL_SSL ?? process.env.W3C_STATS_MARIADB_SSL;
+
+  return sslConfigFromValue(sslMode);
+}
+
+function sslConfigFromValue(sslMode: string | undefined): Partial<PoolOptions> {
   if (sslMode === "0" || sslMode === "false") {
     return {};
   }
@@ -79,6 +113,44 @@ function sslConfig(): Partial<PoolOptions> {
   }
 
   return {};
+}
+
+function resolveW3cStatsDatabaseConfig(): PoolOptions | null {
+  const url = process.env.W3C_STATS_DATABASE_URL ?? process.env.W3C_STATS_MYSQL_URL ?? process.env.W3C_STATS_MARIADB_URL;
+
+  if (url) {
+    return { uri: url, ...w3cStatsSslConfig() };
+  }
+
+  const database =
+    process.env.W3C_STATS_DB_NAME ??
+    process.env.W3C_STATS_DATABASE ??
+    process.env.W3C_STATS_MYSQL_DATABASE ??
+    process.env.W3C_STATS_MYSQL_DB ??
+    process.env.W3C_STATS_MARIADB_DATABASE ??
+    process.env.W3C_STATS_MARIADB_DB;
+  const host = process.env.W3C_STATS_DB_HOST ?? process.env.W3C_STATS_MYSQL_HOST ?? process.env.W3C_STATS_MARIADB_HOST;
+  const user = process.env.W3C_STATS_DB_USER ?? process.env.W3C_STATS_MYSQL_USER ?? process.env.W3C_STATS_MARIADB_USER;
+  const password =
+    process.env.W3C_STATS_DB_PASSWORD ?? process.env.W3C_STATS_MYSQL_PASSWORD ?? process.env.W3C_STATS_MARIADB_PASSWORD;
+  const portValue = process.env.W3C_STATS_DB_PORT ?? process.env.W3C_STATS_MYSQL_PORT ?? process.env.W3C_STATS_MARIADB_PORT;
+
+  if (!database && !host && !user && !password && !portValue) {
+    return null;
+  }
+
+  return {
+    database,
+    host: host ?? "127.0.0.1",
+    password,
+    port: portValue ? Number(portValue) : 3306,
+    user: user ?? "root",
+    ...w3cStatsSslConfig()
+  };
+}
+
+function truthyEnv(value: string | undefined) {
+  return value === "1" || value === "true" || value === "yes";
 }
 
 async function discoverLocalConfig(): Promise<PoolOptions | null> {

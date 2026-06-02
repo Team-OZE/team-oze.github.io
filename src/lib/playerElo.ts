@@ -1,5 +1,5 @@
 import type { RowDataPacket } from "mysql2";
-import { getDatabasePool } from "./database";
+import { getW3cStatsDatabasePool } from "./database";
 
 export const w3ChampionsLegion4v4Mode = 202;
 export const w3ChampionsLegion1v1Mode = 203;
@@ -32,7 +32,7 @@ export async function getCachedW3ChampionsMmrByModeMap(battleTags: string[]): Pr
     return new Map();
   }
 
-  const pool = await getDatabasePool();
+  const pool = await getW3cStatsDatabasePool();
 
   if (!pool) {
     return new Map();
@@ -64,6 +64,38 @@ export async function getCachedW3ChampionsMmrByModeMap(battleTags: string[]): Pr
     return mmrByBattleTag;
   } catch {
     return new Map();
+  }
+}
+
+export async function getCachedW3ChampionsBattleTagsInMmrRange(gameMode: number, min: number, max: number) {
+  const lower = Math.min(min, max);
+  const upper = Math.max(min, max);
+  const pool = await getW3cStatsDatabasePool();
+
+  if (!pool || !Number.isFinite(lower) || !Number.isFinite(upper)) {
+    return [];
+  }
+
+  try {
+    const [rows] = await pool.query<CachedW3cPlayerRatingRow[]>(
+      `SELECT
+         normalized_battle_tag AS normalizedBattleTag,
+         legion_4v4_mmr AS legion4v4Mmr,
+         profile_payload_json AS profilePayloadJson,
+         w3c_game_mode_stats_json AS gameModeStatsJson
+       FROM w3c_player_stats
+       WHERE normalized_battle_tag <> ''`
+    );
+
+    return rows
+      .filter((row) => {
+        const mmr = mmrByModeFromCachedRow(row).get(gameMode);
+        return typeof mmr === "number" && mmr >= lower && mmr <= upper;
+      })
+      .map((row) => normalizeBattleTag(row.normalizedBattleTag))
+      .filter(Boolean);
+  } catch {
+    return [];
   }
 }
 
