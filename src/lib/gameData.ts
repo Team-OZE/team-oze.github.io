@@ -6,6 +6,7 @@ import {
   w3ChampionsGameModeForTeamSize
 } from "./playerElo";
 import {
+  type EloRange,
   type GameModeOption,
   type GamesPage,
   type Player,
@@ -20,6 +21,8 @@ type GamesPageArgs = {
   mode?: string | null;
   gameMode?: string | null;
   player?: string | null;
+  eloMin?: number | null;
+  eloMax?: number | null;
   groupPages?: Record<string, number>;
 };
 
@@ -47,6 +50,11 @@ type OptionRow = RowDataPacket & {
 
 type CountRow = RowDataPacket & {
   count: number;
+};
+
+type EloRangeRow = RowDataPacket & {
+  minElo: number | string | null;
+  maxElo: number | string | null;
 };
 
 type PlayerSearchGroupRow = RowDataPacket & {
@@ -92,12 +100,15 @@ export async function getGamesPage(args: GamesPageArgs = {}): Promise<GamesPage>
   const selectedGameMode = requestedGameMode ?? defaultGameMode(gameModes);
   const pageSize = normalizeInteger(args.pageSize ?? defaultPageSize, defaultPageSize, 1, maxPageSize);
   const playerQuery = normalizePlayerSearch(args.player);
-  const count = playerQuery ? 0 : await loadFilteredMatchCount(pool, { mode, gameMode: selectedGameMode });
+  const eloRangeBounds = await loadEloRange(pool, { mode, gameMode: selectedGameMode });
+  const selectedEloRange = normalizeEloRange(args.eloMin, args.eloMax, eloRangeBounds);
+  const eloFilter = selectedEloRange && isEloRangeActive(selectedEloRange) ? selectedEloRange : null;
+  const count = playerQuery ? 0 : await loadFilteredMatchCount(pool, { mode, gameMode: selectedGameMode, eloFilter });
   const pageCount = Math.max(1, Math.ceil(count / pageSize));
   const page = normalizeInteger(args.page ?? 1, 1, 1, pageCount);
   const offset = (page - 1) * pageSize;
   const matchRows =
-    count > 0 && !playerQuery ? await loadMatchPage(pool, { mode, gameMode: selectedGameMode, pageSize, offset }) : [];
+    count > 0 && !playerQuery ? await loadMatchPage(pool, { mode, gameMode: selectedGameMode, eloFilter, pageSize, offset }) : [];
   const playersByMatch = await loadPlayersForMatches(
     pool,
     matchRows.map((match) => Number(match.id))
@@ -108,6 +119,7 @@ export async function getGamesPage(args: GamesPageArgs = {}): Promise<GamesPage>
         preferredMode: mode,
         preferredGameMode: selectedGameMode,
         pageSize,
+        eloFilter,
         groupPages: args.groupPages ?? {}
       })
     : null;
@@ -119,6 +131,7 @@ export async function getGamesPage(args: GamesPageArgs = {}): Promise<GamesPage>
     modes,
     gameMode: selectedGameMode,
     gameModes,
+    eloRange: selectedEloRange,
     page,
     pageSize,
     pageCount,
@@ -155,9 +168,70 @@ async function loadGameModeOptions(pool: Awaited<ReturnType<typeof getDatabasePo
   return rows.map(optionFromRow).sort(sortGameModeOptions);
 }
 
-async function loadFilteredMatchCount(
+async function loadEloRange(
   pool: Awaited<ReturnType<typeof getDatabasePool>>,
   filters: { mode: string | null; gameMode: string | null }
+): Promise<EloRange | null> {
+  if (!pool || !filters.mode || !filters.gameMode) return null;
+
+  const { where, params } = matchFilter({ ...filters, eloFilter: null });
+  const w3cGameMode = w3cGameModeExpression(teamSizeExpression);
+  const playerMmr = w3cPlayerMmrExpression(w3cGameMode);
+
+  try {
+    const [rows] = await pool.query<EloRangeRow[]>(
+      `SELECT MIN(player_mmr) AS minElo, MAX(player_mmr) AS maxElo
+       FROM (
+         SELECT ${playerMmr} AS player_mmr
+         FROM matches m
+         ${playerCountJoin}
+         INNER JOIN players elo_player
+           ON elo_player.match_id = m.id
+          AND elo_player.battle_tag <> ''
+          AND elo_player.battle_tag <> 'FLO'
+         INNER JOIN w3c_player_stats elo_stats
+           ON elo_stats.normalized_battle_tag = LOWER(elo_player.battle_tag)
+         LEFT JOIN ${w3cModeStatsJsonTable()} ON elo_mode.game_mode = ${w3cGameMode}
+         ${where}
+       ) elo_values
+       WHERE player_mmr IS NOT NULL`,
+      params
+    );
+    const minElo = Number(rows[0]?.minElo);
+    const maxElo = Number(rows[0]?.maxElo);
+
+    if (!Number.isFinite(minElo) || !Number.isFinite(maxElo)) {
+      return null;
+    }
+
+    const min = Math.floor(minElo / 100) * 100;
+    const max = Math.ceil(maxElo / 100) * 100;
+
+    if (min >= max) {
+      const rounded = Math.round(minElo / 100) * 100;
+
+      return {
+        min: rounded - 100,
+        max: rounded + 100,
+        selectedMin: rounded - 100,
+        selectedMax: rounded + 100
+      };
+    }
+
+    return {
+      min,
+      max,
+      selectedMin: min,
+      selectedMax: max
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function loadFilteredMatchCount(
+  pool: Awaited<ReturnType<typeof getDatabasePool>>,
+  filters: { mode: string | null; gameMode: string | null; eloFilter: EloRange | null }
 ) {
   if (!pool || !filters.mode || !filters.gameMode) return 0;
 
@@ -175,7 +249,7 @@ async function loadFilteredMatchCount(
 
 async function loadMatchPage(
   pool: Awaited<ReturnType<typeof getDatabasePool>>,
-  filters: { mode: string | null; gameMode: string | null; pageSize: number; offset: number }
+  filters: { mode: string | null; gameMode: string | null; eloFilter: EloRange | null; pageSize: number; offset: number }
 ) {
   if (!pool || !filters.mode || !filters.gameMode) return [];
 
@@ -204,11 +278,12 @@ async function loadMatchPage(
 
 async function loadPlayerSearchMatchPage(
   pool: Awaited<ReturnType<typeof getDatabasePool>>,
-  filters: { mode: string | null; gameMode: string | null; pageSize: number; offset: number; player: string }
+  filters: { mode: string | null; gameMode: string | null; eloFilter: EloRange | null; pageSize: number; offset: number; player: string }
 ) {
   if (!pool || !filters.mode || !filters.gameMode) return [];
 
   const gameModeFilter = gameModeWhere(filters.gameMode);
+  const eloFilter = eloRangeWhere(filters.eloFilter, playerSearchTeamSizeExpression);
   const [matchRows] = await pool.query<MatchRow[]>(
     `SELECT
        m.id,
@@ -223,9 +298,17 @@ async function loadPlayerSearchMatchPage(
      ${gameInitJoin}
      WHERE ${playerSearchModeExpression} = ?
        AND ${gameModeFilter.sql}
+       ${eloFilter.sql ? `AND ${eloFilter.sql}` : ""}
      ORDER BY m.started_at DESC, m.id DESC
      LIMIT ? OFFSET ?`,
-    [...playerSearchParams(filters.player), filters.mode, ...gameModeFilter.params, filters.pageSize, filters.offset]
+    [
+      ...playerSearchParams(filters.player),
+      filters.mode,
+      ...gameModeFilter.params,
+      ...eloFilter.params,
+      filters.pageSize,
+      filters.offset
+    ]
   );
 
   return matchRows;
@@ -238,6 +321,7 @@ async function loadPlayerSearch(
     preferredMode: string | null;
     preferredGameMode: string | null;
     pageSize: number;
+    eloFilter: EloRange | null;
     groupPages: Record<string, number>;
   }
 ) {
@@ -245,14 +329,16 @@ async function loadPlayerSearch(
     return null;
   }
 
+  const eloFilter = eloRangeWhere(args.eloFilter, playerSearchTeamSizeExpression);
   const [groupRows] = await pool.query<PlayerSearchGroupRow[]>(
     `SELECT
        ${playerSearchModeExpression} AS mode,
        ${gameModeExpression} AS gameMode,
        COUNT(*) AS count
      FROM ${playerSearchMatchesFrom()}
+     ${eloFilter.sql ? `WHERE ${eloFilter.sql}` : ""}
      GROUP BY mode, gameMode`,
-    playerSearchParams(args.query)
+    [...playerSearchParams(args.query), ...eloFilter.params]
   );
   const groups = groupRows
     .map((row) => ({
@@ -271,6 +357,7 @@ async function loadPlayerSearch(
     const groupRows = await loadPlayerSearchMatchPage(pool, {
       mode: group.mode,
       gameMode: group.gameMode,
+      eloFilter: args.eloFilter,
       pageSize: args.pageSize,
       offset,
       player: args.query
@@ -338,9 +425,9 @@ async function loadPlayersForMatches(pool: Awaited<ReturnType<typeof getDatabase
   return playersByMatch;
 }
 
-function matchFilter(filters: { mode: string | null; gameMode: string | null }) {
+function matchFilter(filters: { mode: string | null; gameMode: string | null; eloFilter?: EloRange | null }) {
   const clauses: string[] = [];
-  const params: Array<string> = [];
+  const params: Array<number | string> = [];
 
   if (filters.mode) {
     clauses.push(`${modeExpression} = ?`);
@@ -353,10 +440,98 @@ function matchFilter(filters: { mode: string | null; gameMode: string | null }) 
     params.push(...gameModeFilter.params);
   }
 
+  const eloFilter = eloRangeWhere(filters.eloFilter ?? null, teamSizeExpression);
+
+  if (eloFilter.sql) {
+    clauses.push(eloFilter.sql);
+    params.push(...eloFilter.params);
+  }
+
   return {
     where: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "",
     params
   };
+}
+
+function normalizeEloRange(rawMin: number | null | undefined, rawMax: number | null | undefined, bounds: EloRange | null) {
+  if (!bounds) {
+    return null;
+  }
+
+  const lower = normalizeEloBound(rawMin, bounds.min, bounds);
+  const upper = normalizeEloBound(rawMax, bounds.max, bounds);
+  const selectedMin = Math.min(lower, upper);
+  const selectedMax = Math.max(lower, upper);
+
+  return {
+    ...bounds,
+    selectedMin,
+    selectedMax
+  };
+}
+
+function normalizeEloBound(value: number | null | undefined, fallback: number, bounds: EloRange) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const rounded = Math.round(value / 100) * 100;
+
+  return Math.min(bounds.max, Math.max(bounds.min, rounded));
+}
+
+function isEloRangeActive(range: EloRange) {
+  return range.selectedMin > range.min || range.selectedMax < range.max;
+}
+
+function eloRangeWhere(range: EloRange | null, teamSizeSql: string) {
+  if (!range) {
+    return { sql: "", params: [] as number[] };
+  }
+
+  const w3cGameMode = w3cGameModeExpression(teamSizeSql);
+  const playerMmr = w3cPlayerMmrExpression(w3cGameMode);
+
+  return {
+    sql: `EXISTS (
+       SELECT 1
+       FROM players elo_player
+       INNER JOIN w3c_player_stats elo_stats
+         ON elo_stats.normalized_battle_tag = LOWER(elo_player.battle_tag)
+       LEFT JOIN ${w3cModeStatsJsonTable()} ON elo_mode.game_mode = ${w3cGameMode}
+       WHERE elo_player.match_id = m.id
+         AND elo_player.battle_tag <> ''
+         AND elo_player.battle_tag <> 'FLO'
+         AND ${playerMmr} BETWEEN ? AND ?
+     )`,
+    params: [range.selectedMin, range.selectedMax]
+  };
+}
+
+function w3cGameModeExpression(teamSizeSql: string) {
+  return `CASE ${teamSizeSql}
+         WHEN 1 THEN 203
+         WHEN 2 THEN 205
+         WHEN 4 THEN 202
+         ELSE NULL
+       END`;
+}
+
+function w3cPlayerMmrExpression(w3cGameModeSql: string) {
+  return `COALESCE(
+         elo_mode.mmr,
+         CASE WHEN ${w3cGameModeSql} = 202 THEN elo_stats.legion_4v4_mmr END
+       )`;
+}
+
+function w3cModeStatsJsonTable() {
+  return `JSON_TABLE(
+         IF(JSON_VALID(elo_stats.w3c_game_mode_stats_json), elo_stats.w3c_game_mode_stats_json, JSON_ARRAY()),
+         '$[*]' COLUMNS (
+           game_mode INT PATH '$.gameMode' NULL ON EMPTY NULL ON ERROR,
+           mmr DECIMAL(10,3) PATH '$.mmr' NULL ON EMPTY NULL ON ERROR
+         )
+       ) AS elo_mode`;
 }
 
 function gameModeWhere(gameMode: string | null) {

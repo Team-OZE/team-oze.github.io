@@ -32,6 +32,13 @@ export type GameModeOption = {
   count: number;
 };
 
+export type EloRange = {
+  min: number;
+  max: number;
+  selectedMin: number;
+  selectedMax: number;
+};
+
 export type GamesPage = {
   source: string;
   count: number;
@@ -39,6 +46,7 @@ export type GamesPage = {
   modes: GameModeOption[];
   gameMode: string | null;
   gameModes: GameModeOption[];
+  eloRange: EloRange | null;
   page: number;
   pageSize: number;
   pageCount: number;

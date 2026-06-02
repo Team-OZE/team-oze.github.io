@@ -39,11 +39,24 @@ type GamesPayload = {
   modes: GameModeOption[];
   gameMode: string | null;
   gameModes: GameModeOption[];
+  eloRange: EloRange | null;
   page: number;
   pageSize: number;
   pageCount: number;
   replays: Replay[];
   playerSearch?: PlayerSearchResult | null;
+};
+
+type EloRange = {
+  min: number;
+  max: number;
+  selectedMin: number;
+  selectedMax: number;
+};
+
+type EloFilterValue = {
+  min: number;
+  max: number;
 };
 
 type GameModeOption = {
@@ -1532,6 +1545,146 @@ function PlayerSearchBox({
   );
 }
 
+function EloRangeFilter({
+  onChange,
+  range,
+  value
+}: {
+  onChange: (value: EloFilterValue | null) => void;
+  range: EloRange | null;
+  value: EloFilterValue | null;
+}) {
+  const dragThumbRef = React.useRef<"min" | "max" | null>(null);
+
+  if (!range) {
+    return null;
+  }
+
+  const availableRange = range;
+  const lower = clampElo(value?.min ?? availableRange.selectedMin, availableRange);
+  const upper = clampElo(value?.max ?? availableRange.selectedMax, availableRange);
+  const selectedMin = Math.min(lower, upper);
+  const selectedMax = Math.max(lower, upper);
+  const span = Math.max(1, availableRange.max - availableRange.min);
+  const minPosition = ((selectedMin - availableRange.min) / span) * 100;
+  const maxPosition = ((selectedMax - availableRange.min) / span) * 100;
+  const isActive = selectedMin > availableRange.min || selectedMax < availableRange.max;
+  const trackStyle = {
+    "--elo-min-position": `${minPosition}%`,
+    "--elo-max-position": `${maxPosition}%`
+  } as React.CSSProperties;
+
+  function commit(nextMin: number, nextMax: number) {
+    const safeMin = clampElo(Math.min(nextMin, nextMax), availableRange);
+    const safeMax = clampElo(Math.max(nextMin, nextMax), availableRange);
+
+    onChange(safeMin === availableRange.min && safeMax === availableRange.max ? null : { min: safeMin, max: safeMax });
+  }
+
+  function valueFromPointer(event: React.PointerEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = Math.min(rect.width, Math.max(0, event.clientX - rect.left));
+    const ratio = rect.width > 0 ? position / rect.width : 0;
+
+    return clampElo(availableRange.min + ratio * (availableRange.max - availableRange.min), availableRange);
+  }
+
+  function commitPointerValue(thumb: "min" | "max", pointerValue: number) {
+    if (thumb === "min") {
+      commit(Math.min(pointerValue, selectedMax), selectedMax);
+      return;
+    }
+
+    commit(selectedMin, Math.max(pointerValue, selectedMin));
+  }
+
+  function handleTrackPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const pointerValue = valueFromPointer(event);
+    const thumb = Math.abs(pointerValue - selectedMin) <= Math.abs(pointerValue - selectedMax) ? "min" : "max";
+
+    event.preventDefault();
+    dragThumbRef.current = thumb;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    commitPointerValue(thumb, pointerValue);
+  }
+
+  function handleTrackPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragThumbRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+    commitPointerValue(dragThumbRef.current, valueFromPointer(event));
+  }
+
+  function handleTrackPointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    dragThumbRef.current = null;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  return (
+    <div className={isActive ? "elo-range-filter elo-range-filter-active" : "elo-range-filter"} role="group" aria-label="ELO range">
+      <div className="elo-range-filter__head">
+        <span>ELO</span>
+        <strong>{formatEloRangeLabel(selectedMin, selectedMax)}</strong>
+        {isActive ? (
+          <button type="button" onClick={() => onChange(null)} aria-label="Reset ELO range" title="Reset ELO range">
+            <X aria-hidden="true" size={15} strokeWidth={2.2} />
+          </button>
+        ) : null}
+      </div>
+      <div
+        className="elo-range-filter__track"
+        style={trackStyle}
+        onPointerCancel={handleTrackPointerEnd}
+        onPointerDown={handleTrackPointerDown}
+        onPointerMove={handleTrackPointerMove}
+        onPointerUp={handleTrackPointerEnd}
+      >
+        <input
+          aria-label="Minimum ELO"
+          aria-valuetext={`${selectedMin} ELO`}
+          max={availableRange.max}
+          min={availableRange.min}
+          step={100}
+          type="range"
+          value={selectedMin}
+          onChange={(event) => commit(Number(event.target.value), selectedMax)}
+        />
+        <input
+          aria-label="Maximum ELO"
+          aria-valuetext={`${selectedMax} ELO`}
+          max={availableRange.max}
+          min={availableRange.min}
+          step={100}
+          type="range"
+          value={selectedMax}
+          onChange={(event) => commit(selectedMin, Number(event.target.value))}
+        />
+      </div>
+      <div className="elo-range-filter__bounds" aria-hidden="true">
+        <span>{formatProfileNumber(availableRange.min)}</span>
+        <span>{formatProfileNumber(availableRange.max)}</span>
+      </div>
+    </div>
+  );
+}
+
+function clampElo(value: number, range: EloRange) {
+  return Math.min(range.max, Math.max(range.min, Math.round(value / 100) * 100));
+}
+
+function formatEloRangeLabel(min: number, max: number) {
+  return `${formatProfileNumber(min)}-${formatProfileNumber(max)}`;
+}
+
 function ReplayTable({
   emptyMessage,
   error,
@@ -1679,6 +1832,7 @@ function GamesView() {
   const [playerSearchInput, setPlayerSearchInput] = React.useState("");
   const [playerQuery, setPlayerQuery] = React.useState("");
   const [playerGroupPages, setPlayerGroupPages] = React.useState<Record<string, number>>({});
+  const [eloFilter, setEloFilter] = React.useState<EloFilterValue | null>(null);
   const [payload, setPayload] = React.useState<GamesPayload | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -1811,6 +1965,11 @@ function GamesView() {
           params.set("groupPages", JSON.stringify(playerGroupPages));
         }
 
+        if (eloFilter) {
+          params.set("eloMin", String(eloFilter.min));
+          params.set("eloMax", String(eloFilter.max));
+        }
+
         const response = await fetch(`/api/games?${params.toString()}`, {
           signal: controller.signal
         });
@@ -1843,7 +2002,7 @@ function GamesView() {
       isCurrent = false;
       controller.abort();
     };
-  }, [page, reloadKey, selectedMode, selectedGameMode, playerQuery, playerGroupPages]);
+  }, [page, reloadKey, selectedMode, selectedGameMode, playerQuery, playerGroupPages, eloFilter]);
 
   const pageItems = payload?.replays ?? [];
   const currentPage = payload?.page ?? page;
@@ -1855,13 +2014,23 @@ function GamesView() {
 
   function selectMode(mode: string) {
     setPage(1);
+    setPlayerGroupPages({});
+    setEloFilter(null);
     setSelectedMode(mode);
     setSelectedGameMode(null);
   }
 
   function selectGameMode(gameMode: string) {
     setPage(1);
+    setPlayerGroupPages({});
+    setEloFilter(null);
     setSelectedGameMode(gameMode);
+  }
+
+  function selectEloFilter(nextFilter: EloFilterValue | null) {
+    setPage(1);
+    setPlayerGroupPages({});
+    setEloFilter(nextFilter);
   }
 
   function scrollToGamesTop() {
@@ -1944,6 +2113,7 @@ function GamesView() {
               onChange={selectGameMode}
             />
           ) : null}
+          <EloRangeFilter range={payload?.eloRange ?? null} value={eloFilter} onChange={selectEloFilter} />
           <PlayerSearchBox value={playerSearchInput} onChange={setPlayerSearchInput} />
         </div>
 
