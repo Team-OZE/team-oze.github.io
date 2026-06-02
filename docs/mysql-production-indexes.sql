@@ -4,6 +4,8 @@
 --   mysql --default-character-set=utf8mb4 -h HOST -u USER -p DATABASE_NAME < docs/mysql-production-indexes.sql
 --
 -- This file is intentionally re-runnable. The helper procedures skip indexes/columns that already exist.
+-- Use a migration/admin DB user with ALTER TABLE plus CREATE/ALTER ROUTINE privileges. If your app DB user cannot
+-- create routines, run this file as root/admin or apply the CREATE INDEX/ALTER TABLE statements manually.
 -- For very large tables, add these during a quiet window or with your host's online-DDL tooling.
 
 DELIMITER $$
@@ -102,6 +104,30 @@ CALL team_oze_add_index_if_missing(
   'players',
   'idx_players_battle_tag_match_player',
   'CREATE INDEX idx_players_battle_tag_match_player ON players (battle_tag, match_id, player_id)'
+);
+
+-- Games ELO slider hot path.
+-- The range filter first narrows candidate matches, then checks whether at least one non-FLO player in the match has
+-- cached W3C MMR inside the selected range. These match-first covering indexes keep that per-match player lookup small.
+CALL team_oze_add_index_if_missing(
+  'players',
+  'idx_players_match_battle_tag_player',
+  'CREATE INDEX idx_players_match_battle_tag_player ON players (match_id, battle_tag, player_id)'
+);
+
+CALL team_oze_add_index_if_missing(
+  'players',
+  'idx_players_match_battle_tag_normalized_player',
+  'CREATE INDEX idx_players_match_battle_tag_normalized_player ON players (match_id, battle_tag_normalized, player_id)'
+);
+
+-- Exact W3C profile lookups are covered by UNIQUE(normalized_battle_tag). Legion 4v4 MMR is also a scalar column, so
+-- this supports future/range-first 4v4 ELO plans. Legion 1v1/2v2 MMR currently lives in w3c_game_mode_stats_json; a true
+-- B-tree range index for those modes requires materializing per-mode MMR into columns or a child table.
+CALL team_oze_add_index_if_missing(
+  'w3c_player_stats',
+  'idx_w3c_player_stats_4v4_mmr_normalized',
+  'CREATE INDEX idx_w3c_player_stats_4v4_mmr_normalized ON w3c_player_stats (legion_4v4_mmr, normalized_battle_tag)'
 );
 
 -- Games page filters by gamemode and sorts newest first.
