@@ -4447,14 +4447,35 @@ function playerRollAtOrBefore(playerId, timeMillis = state.timeMillis) {
   return lastAtOrBefore(state.replayIndex.rollsByPlayer.get(Number(playerId)) || [], timeMillis);
 }
 
-function playerRollDisplayTimeAt(timeMillis = state.timeMillis) {
+function playerRollForWaveLevel(playerId, level) {
+  const normalizedLevel = Number(level);
+  if (!Number.isFinite(normalizedLevel) || normalizedLevel < 1) return undefined;
+  const rolls = state.replayIndex.rollsByPlayer.get(Number(playerId)) || [];
+  return rolls[Math.floor(normalizedLevel) - 1];
+}
+
+function playerRollForWave(playerId, wave) {
+  if (!wave) return undefined;
+
+  const roll = playerRollForWaveLevel(playerId, wave.level);
+  if (roll) return roll;
+
+  return playerRollAtOrBefore(playerId, Math.max(0, Number(wave.startMillis) - 1));
+}
+
+function playerRollAtDisplayTime(playerId, timeMillis = state.timeMillis) {
   const reviewWave = reviewWaveAtTime(timeMillis);
-  if (reviewWave) return Math.max(0, Number(reviewWave.startMillis) - 1);
+  if (reviewWave) return playerRollForWave(playerId, reviewWave);
 
   const status = waveStatusAtTime(timeMillis);
-  if (status.phase === "wave" && status.wave) return Math.max(0, Number(status.wave.startMillis) - 1);
+  if (status.phase === "wave" && status.wave) return playerRollForWave(playerId, status.wave);
 
-  return timeMillis;
+  if (status.phase === "build" && status.nextWave) {
+    const nextWaveRoll = playerRollForWaveLevel(playerId, status.nextWave.level);
+    if (nextWaveRoll && Number(nextWaveRoll.timeMillis) <= Number(timeMillis)) return nextWaveRoll;
+  }
+
+  return playerRollAtOrBefore(playerId, timeMillis);
 }
 
 function rollIconFallbackLabel(unit) {
@@ -4834,7 +4855,7 @@ function renderPlayerRoll(card, playerId) {
   const roll = card.querySelector("[data-player-roll]");
   if (!roll) return;
 
-  const playerRoll = playerRollAtOrBefore(playerId, playerRollDisplayTimeAt());
+  const playerRoll = playerRollAtDisplayTime(playerId);
   const units = playerRoll?.units || [];
   if (!units.length) {
     roll.hidden = true;
